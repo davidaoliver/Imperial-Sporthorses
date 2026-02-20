@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#292524"/>
+  <g transform="translate(96,100)" fill="none" stroke="#d6d3d1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Barn shape -->
+    <path d="M-50,20 L-50,-20 L0,-45 L50,-20 L50,20 Z" fill="#44403c"/>
+    <path d="M-50,-20 L0,-45 L50,-20" stroke="#a8a29e"/>
+    <!-- Door -->
+    <rect x="-12" y="-5" width="24" height="25" rx="3" fill="#292524" stroke="#a8a29e"/>
+    <!-- Horseshoe -->
+    <path d="M-8,-30 A10,10 0 0,1 8,-30" stroke="#f59e0b" stroke-width="4" fill="none"/>
+    <circle cx="-8" cy="-30" r="2" fill="#f59e0b"/>
+    <circle cx="8" cy="-30" r="2" fill="#f59e0b"/>
+  </g>
+  <text x="96" y="160" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#d6d3d1">BM</text>
+</svg>

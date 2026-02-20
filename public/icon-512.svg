@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#292524"/>
+  <g transform="translate(256,250)" fill="none" stroke="#d6d3d1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Barn shape -->
+    <path d="M-120,55 L-120,-50 L0,-115 L120,-50 L120,55 Z" fill="#44403c"/>
+    <path d="M-120,-50 L0,-115 L120,-50" stroke="#a8a29e"/>
+    <!-- Door -->
+    <rect x="-30" y="-10" width="60" height="65" rx="6" fill="#292524" stroke="#a8a29e"/>
+    <!-- Horseshoe -->
+    <path d="M-22,-75 A26,26 0 0,1 22,-75" stroke="#f59e0b" stroke-width="10" fill="none"/>
+    <circle cx="-22" cy="-75" r="5" fill="#f59e0b"/>
+    <circle cx="22" cy="-75" r="5" fill="#f59e0b"/>
+  </g>
+  <text x="256" y="420" text-anchor="middle" font-family="system-ui,sans-serif" font-size="48" font-weight="700" fill="#d6d3d1">BARN MANAGER</text>
+</svg>

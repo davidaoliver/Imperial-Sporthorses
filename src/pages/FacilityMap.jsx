@@ -314,7 +314,7 @@ export default function FacilityMap() {
   // Tap handling
   function handleAreaTap(area) {
     if (editMode) {
-      setSelectedArea(area); setEditLabel(area.label); setEditLocationId(area.locationId || '')
+      // In edit mode, just select for drag/resize — no popup
       return
     }
     if (draggingHorse) {

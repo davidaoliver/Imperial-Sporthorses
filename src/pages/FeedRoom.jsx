@@ -18,12 +18,14 @@ export default function FeedRoom() {
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState('chart')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showInventoryModal, setShowInventoryModal] = useState(false)
   const [newItem, setNewItem] = useState({
     feed_name: '',
     quantity: '',
     delivery_date: format(new Date(), 'yyyy-MM-dd'),
     expiration_date: '',
   })
+  const [newInventory, setNewInventory] = useState({ feed_name: '', quantity: '' })
 
   const fetchData = useCallback(async () => {
     try {
@@ -104,13 +106,22 @@ export default function FeedRoom() {
           <p className="text-xs text-neutral-400">Nutrition & inventory management</p>
         </div>
         {activeSection === 'inventory' && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-500/30 transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Delivery
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowInventoryModal(true)}
+              className="flex items-center gap-1.5 text-xs bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg font-medium hover:bg-green-500/30 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Item
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-500/30 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Log Delivery
+            </button>
+          </div>
         )}
       </div>
 
@@ -213,7 +224,7 @@ export default function FeedRoom() {
             <div className="text-center py-16 text-neutral-500">
               <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="font-medium">No inventory recorded</p>
-              <p className="text-xs mt-1">Tap "Add Delivery" to add feed inventory.</p>
+              <p className="text-xs mt-1">Tap "Add Item" to track inventory.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -260,6 +271,61 @@ export default function FeedRoom() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Add Inventory Modal */}
+      {showInventoryModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center animate-fade-in">
+          <div className="bg-neutral-900 border-t border-neutral-700 rounded-t-2xl w-full max-w-lg p-5 pb-8 animate-slide-up">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-neutral-100">Add Inventory Item</h3>
+              <button onClick={() => setShowInventoryModal(false)}>
+                <X className="w-5 h-5 text-neutral-500" />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!newInventory.feed_name.trim()) return
+                const { error } = await supabase.from('feed_inventory').insert({
+                  feed_name: newInventory.feed_name.trim(),
+                  quantity: newInventory.quantity.trim() || null,
+                })
+                if (error) { console.error('Error adding item:', error); return }
+                setNewInventory({ feed_name: '', quantity: '' })
+                setShowInventoryModal(false)
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 mb-1">Item Name *</label>
+                <input
+                  type="text"
+                  value={newInventory.feed_name}
+                  onChange={(e) => setNewInventory({ ...newInventory, feed_name: e.target.value })}
+                  placeholder="e.g. Grain, Shavings, Supplements"
+                  className="w-full rounded-xl border border-neutral-700 bg-neutral-800 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 mb-1">Quantity</label>
+                <input
+                  type="text"
+                  value={newInventory.quantity}
+                  onChange={(e) => setNewInventory({ ...newInventory, quantity: e.target.value })}
+                  placeholder="e.g. 10 bags, 3 bales"
+                  className="w-full rounded-xl border border-neutral-700 bg-neutral-800 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-green-600 text-white rounded-xl px-4 py-3 font-semibold hover:bg-green-500 transition mt-2"
+              >
+                Add to Inventory
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

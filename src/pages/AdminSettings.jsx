@@ -283,10 +283,8 @@ export default function AdminSettings() {
 
       {activeSection === 'locations' && (
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-neutral-300 mb-3">
-            Stalls & Pastures
-          </h3>
-          <form onSubmit={addLocation} className="flex gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-neutral-300 mb-3">Stalls & Pastures</h3>
+          <form onSubmit={addLocation} className="flex gap-2 mb-4">
             <input
               type="text"
               value={newLocation.name}
@@ -306,18 +304,84 @@ export default function AdminSettings() {
               <Plus className="w-4 h-4" />
             </button>
           </form>
-          <div className="space-y-1">
-            {locations.map((loc) => (
-              <div key={loc.id} className="flex items-center justify-between py-1.5 text-sm">
-                <span className="text-neutral-300">
-                  {loc.name}{' '}
-                  <span className="text-[10px] text-neutral-500">({loc.type})</span>
-                </span>
-                <button onClick={() => deleteLocation(loc.id)} className="p-1 text-neutral-500 hover:text-red-400">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+
+          {/* Stalls */}
+          <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide mb-2">Stalls</p>
+          <div className="space-y-1.5 mb-4">
+            {locations.filter(l => l.type === 'Stall').map((loc) => {
+              const horseHere = horses.find(h => h.current_location === loc.id)
+              return (
+                <div key={loc.id} className="flex items-center gap-2 py-1.5 border-b border-neutral-800 last:border-0">
+                  <span className="text-sm text-neutral-300 w-24 shrink-0 font-medium">{loc.name}</span>
+                  <select
+                    value={horseHere?.id || ''}
+                    onChange={async (e) => {
+                      if (horseHere) await supabase.from('horses').update({ current_location: null }).eq('id', horseHere.id)
+                      if (e.target.value) await supabase.from('horses').update({ current_location: loc.id }).eq('id', e.target.value)
+                      fetchAll()
+                    }}
+                    className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">— Empty —</option>
+                    {horses.map(h => (
+                      <option key={h.id} value={h.id}>{h.name}{h.current_location && h.current_location !== loc.id ? ' (elsewhere)' : ''}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => deleteLocation(loc.id)} className="p-1 text-neutral-500 hover:text-red-400 shrink-0">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )
+            })}
+            {locations.filter(l => l.type === 'Stall').length === 0 && (
+              <p className="text-xs text-neutral-500 py-2">No stalls yet. Add one above.</p>
+            )}
+          </div>
+
+          {/* Pastures */}
+          <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wide mb-2">Pastures</p>
+          <div className="space-y-2">
+            {locations.filter(l => l.type === 'Pasture').map((loc) => {
+              const horsesHere = horses.filter(h => h.current_location === loc.id)
+              return (
+                <div key={loc.id} className="bg-neutral-800/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-neutral-200 font-medium">{loc.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-neutral-500">{horsesHere.length} horse{horsesHere.length !== 1 ? 's' : ''}</span>
+                      <button onClick={() => deleteLocation(loc.id)} className="p-1 text-neutral-500 hover:text-red-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {horsesHere.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {horsesHere.map(h => (
+                        <span key={h.id} className="text-[10px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full font-medium">{h.name}</span>
+                      ))}
+                    </div>
+                  )}
+                  <select
+                    value=""
+                    onChange={async (e) => {
+                      if (e.target.value) {
+                        await supabase.from('horses').update({ current_location: loc.id }).eq('id', e.target.value)
+                        fetchAll()
+                      }
+                    }}
+                    className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">+ Add horse to pasture...</option>
+                    {horses.filter(h => h.current_location !== loc.id).map(h => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
+            {locations.filter(l => l.type === 'Pasture').length === 0 && (
+              <p className="text-xs text-neutral-500 py-2">No pastures yet. Add one above.</p>
+            )}
           </div>
         </div>
       )}

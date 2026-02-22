@@ -227,6 +227,8 @@ export default function FacilityMap() {
       if (loc && isAdmin) moveHorse(draggingHorse, loc)
       return
     }
+    // Pastures always show horse names inline, no tap-to-expand
+    if (area.type === 'pasture') return
     setSelectedArea(selectedArea?.id === area.id ? null : area)
   }
 
@@ -316,6 +318,7 @@ export default function FacilityMap() {
             const isSelected = selectedArea?.id === area.id
             const isDropTarget = !editMode && draggingHorse && (area.dbName || area.locationId)
             const isStall = area.type === 'stall'
+            const isPasture = area.type === 'pasture'
 
             return (
               <g
@@ -339,13 +342,19 @@ export default function FacilityMap() {
                 >
                   {area.label}
                 </text>
-                {/* Horse count badge (non-stall) */}
-                {!editMode && !isStall && areaHorses.length > 0 && !isSelected && (
+                {/* Horse count badge (non-stall, non-pasture) */}
+                {!editMode && !isStall && !isPasture && areaHorses.length > 0 && !isSelected && (
                   <>
                     <circle cx={area.x + area.w - 14} cy={area.y + 14} r={9} fill="#f59e0b" />
                     <text x={area.x + area.w - 14} y={area.y + 18} textAnchor="middle" fontSize="10" fontWeight="800" fill="#000">{areaHorses.length}</text>
                   </>
                 )}
+                {/* Pasture: always show horse names */}
+                {!editMode && isPasture && areaHorses.map((h, i) => (
+                  <text key={h.id} x={area.x + area.w / 2} y={area.y + 30 + i * 14}
+                    textAnchor="middle" fontSize="9" fontWeight="600" fill="#e5e5e5"
+                  >{h.name}</text>
+                ))}
                 {/* Stall: show horse name if occupied */}
                 {!editMode && isStall && areaHorses.length > 0 && (
                   <text x={area.x + area.w / 2} y={area.y + area.h / 2 + 13} textAnchor="middle" fontSize="7" fontWeight="600" fill="#e5e5e5">

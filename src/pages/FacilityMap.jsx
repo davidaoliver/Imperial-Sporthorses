@@ -1,26 +1,101 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { MapPin, Home, TreePine, AlertTriangle, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, RefreshCw, X, Pencil, Save } from 'lucide-react'
+
+// Generate Main Barn stalls: 8 bottom, 4 top-left (Stalls 1-12)
+function generateMainBarnStalls() {
+  const stalls = []
+  const bx = 200, by = 340, sw = 27, sh = 35, gap = 2
+  for (let i = 0; i < 8; i++) {
+    stalls.push({ id: `mb-b${i+1}`, label: `${i+1}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+170-sh-6, w: sw, h: sh, parent: 'main-barn', dbName: `Stall ${i+1}` })
+  }
+  for (let i = 0; i < 4; i++) {
+    stalls.push({ id: `mb-t${i+1}`, label: `${i+9}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+22, w: sw, h: sh, parent: 'main-barn', dbName: `Stall ${i+9}` })
+  }
+  return stalls
+}
+
+// Generate 6 Stall Barn stalls: 3 top, 3 bottom (Stalls 13-18)
+function generateSixStallBarnStalls() {
+  const stalls = []
+  const bx = 10, by = 170, sw = 40, sh = 35, gap = 3
+  for (let i = 0; i < 3; i++) {
+    stalls.push({ id: `sb-t${i+1}`, label: `${i+13}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+22, w: sw, h: sh, parent: '6stall', dbName: `Stall ${i+13}` })
+  }
+  for (let i = 0; i < 3; i++) {
+    stalls.push({ id: `sb-b${i+1}`, label: `${i+16}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+130-sh-6, w: sw, h: sh, parent: '6stall', dbName: `Stall ${i+16}` })
+  }
+  return stalls
+}
+
+const DEFAULT_AREAS = [
+  { id: 'pasture-1', label: 'Pasture #1', type: 'pasture', x: 10, y: 10, w: 150, h: 100, dbName: 'Pasture #1' },
+  { id: 'xc', label: 'Cross Country Course', type: 'field', x: 170, y: 10, w: 380, h: 60 },
+  { id: 'pasture-2', label: 'Pasture #2', type: 'pasture', x: 560, y: 10, w: 180, h: 100, dbName: 'Pasture #2' },
+  { id: 'pasture-3', label: 'Pasture #3', type: 'pasture', x: 750, y: 10, w: 240, h: 130, dbName: 'Pasture #3' },
+  { id: 'shed', label: 'Shed', type: 'building', x: 170, y: 140, w: 130, h: 80 },
+  { id: '4stall', label: '4 Stall Barn', type: 'barn', x: 310, y: 140, w: 100, h: 80, dbName: '4 Stall Barn' },
+  { id: 'covered-arena', label: 'Covered Arena', type: 'arena', x: 420, y: 120, w: 200, h: 180 },
+  { id: '6stall', label: '6 Stall Barn', type: 'barn', x: 10, y: 170, w: 150, h: 130, dbName: '6 Stall Barn' },
+  ...generateSixStallBarnStalls(),
+  { id: 'house', label: 'House', type: 'building', x: 640, y: 150, w: 100, h: 280 },
+  { id: 'pasture-4', label: 'Pasture #4', type: 'pasture', x: 750, y: 200, w: 100, h: 200, dbName: 'Pasture #4' },
+  { id: 'tommie-puma', label: 'Tommie & Puma', type: 'pasture', x: 860, y: 200, w: 130, h: 200, dbName: 'Tommie & Puma' },
+  { id: 'outdoor-arena', label: 'Outdoor Arena', type: 'arena', x: 10, y: 380, w: 180, h: 130 },
+  { id: 'main-barn', label: 'Main Barn', type: 'barn', x: 200, y: 340, w: 250, h: 170 },
+  ...generateMainBarnStalls(),
+  { id: 'pasture-5', label: 'Pasture #5', type: 'pasture', x: 200, y: 520, w: 250, h: 90, dbName: 'Pasture #5' },
+  { id: 'parking', label: 'Parking', type: 'road', x: 460, y: 400, w: 80, h: 260 },
+  { id: 'entrance', label: 'Entrance', type: 'road', x: 550, y: 610, w: 120, h: 40 },
+]
+
+const AREA_STYLES = {
+  pasture: { fill: '#14532d', stroke: '#22c55e', strokeW: 1.5, textColor: '#4ade80' },
+  barn: { fill: '#78350f', stroke: '#d97706', strokeW: 1.5, textColor: '#fbbf24' },
+  stall: { fill: '#451a03', stroke: '#92400e', strokeW: 1, textColor: '#d97706' },
+  building: { fill: '#1c1917', stroke: '#57534e', strokeW: 1, textColor: '#a8a29e' },
+  arena: { fill: '#1e1b4b', stroke: '#6366f1', strokeW: 1.5, textColor: '#a5b4fc' },
+  field: { fill: '#052e16', stroke: '#166534', strokeW: 1, textColor: '#4ade80' },
+  road: { fill: '#292524', stroke: '#57534e', strokeW: 1, textColor: '#78716c' },
+}
 
 export default function FacilityMap() {
   const { isAdmin } = useAuth()
+  const svgRef = useRef(null)
+  const [mapAreas, setMapAreas] = useState(DEFAULT_AREAS)
   const [locations, setLocations] = useState([])
   const [horses, setHorses] = useState([])
   const [loading, setLoading] = useState(true)
   const [draggingHorse, setDraggingHorse] = useState(null)
   const [warningModal, setWarningModal] = useState(null)
+  const [selectedArea, setSelectedArea] = useState(null)
+  const [editMode, setEditMode] = useState(false)
+  const [dragInfo, setDragInfo] = useState(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editLocationId, setEditLocationId] = useState('')
+  const [hasChanges, setHasChanges] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
       const [locRes, horseRes] = await Promise.all([
-        supabase.from('locations').select('*').order('grid_row').order('grid_col'),
+        supabase.from('locations').select('*'),
         supabase.from('horses').select('*'),
       ])
       setLocations(locRes.data || [])
       setHorses(horseRes.data || [])
+      // Try loading saved layout
+      const { data: mapData, error: mapErr } = await supabase
+        .from('map_areas').select('*').order('sort_order')
+      if (!mapErr && mapData && mapData.length > 0) {
+        setMapAreas(mapData.map((r) => ({
+          id: r.area_key, label: r.label, type: r.area_type,
+          x: r.x, y: r.y, w: r.w, h: r.h,
+          locationId: r.location_id, parent: r.parent_key, dbId: r.id,
+        })))
+      }
     } catch (err) {
-      console.error('fetchData exception:', err)
+      console.error('fetchData:', err)
     } finally {
       setLoading(false)
     }
@@ -28,237 +103,333 @@ export default function FacilityMap() {
 
   useEffect(() => {
     fetchData()
-
-    const channel = supabase
-      .channel('horses-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'horses' }, () =>
-        fetchData()
-      )
+    const ch = supabase.channel('map-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'horses' }, () => fetchData())
       .subscribe()
-
-    return () => supabase.removeChannel(channel)
+    return () => supabase.removeChannel(ch)
   }, [fetchData])
 
-  function getHorsesAtLocation(locationId) {
-    return horses.filter((h) => h.current_location === locationId)
+  // SVG coordinate conversion
+  function toSvg(cx, cy) {
+    const svg = svgRef.current
+    if (!svg) return { x: 0, y: 0 }
+    const pt = svg.createSVGPoint()
+    pt.x = cx; pt.y = cy
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse())
+    return { x: p.x, y: p.y }
   }
 
-  function getHorsesHomeStall(locationId) {
-    return horses.filter((h) => h.home_stall === locationId)
+  // Edit mode: drag to move
+  function onAreaPointerDown(e, idx) {
+    if (!editMode) return
+    e.stopPropagation(); e.preventDefault()
+    const { x, y } = toSvg(e.clientX, e.clientY)
+    const a = mapAreas[idx]
+    setDragInfo({ idx, ox: x - a.x, oy: y - a.y, mode: 'move' })
   }
 
-  function getHorsesAssignedPasture(locationId) {
-    return horses.filter((h) => h.assigned_pasture === locationId)
+  // Edit mode: resize handles
+  function onHandleDown(e, idx, handle) {
+    if (!editMode) return
+    e.stopPropagation(); e.preventDefault()
+    const { x, y } = toSvg(e.clientX, e.clientY)
+    setDragInfo({ idx, sx: x, sy: y, mode: 'resize', handle, orig: { ...mapAreas[idx] } })
+  }
+
+  function onPointerMove(e) {
+    if (!dragInfo) return
+    const { x, y } = toSvg(e.clientX, e.clientY)
+    setMapAreas((prev) => {
+      const next = [...prev]
+      const a = { ...next[dragInfo.idx] }
+      if (dragInfo.mode === 'move') {
+        a.x = Math.round(x - dragInfo.ox)
+        a.y = Math.round(y - dragInfo.oy)
+      } else {
+        const dx = x - dragInfo.sx, dy = y - dragInfo.sy, o = dragInfo.orig, h = dragInfo.handle
+        if (h.includes('e')) a.w = Math.max(20, Math.round(o.w + dx))
+        if (h.includes('w')) { a.x = Math.round(o.x + dx); a.w = Math.max(20, Math.round(o.w - dx)) }
+        if (h.includes('s')) a.h = Math.max(15, Math.round(o.h + dy))
+        if (h.includes('n')) { a.y = Math.round(o.y + dy); a.h = Math.max(15, Math.round(o.h - dy)) }
+      }
+      next[dragInfo.idx] = a
+      return next
+    })
+    setHasChanges(true)
+  }
+
+  function onPointerUp() { setDragInfo(null) }
+
+  // Save layout to DB
+  async function saveLayout() {
+    const rows = mapAreas.map((a, i) => ({
+      area_key: a.id, label: a.label, area_type: a.type,
+      x: a.x, y: a.y, w: a.w, h: a.h,
+      location_id: a.locationId || null, parent_key: a.parent || null, sort_order: i,
+    }))
+    const { error } = await supabase.from('map_areas').upsert(rows, { onConflict: 'area_key' })
+    if (error) {
+      console.error('Save layout error:', error)
+      alert('Failed to save: ' + error.message)
+    } else {
+      setHasChanges(false)
+    }
+  }
+
+  // Horse helpers
+  function findDbLocation(area) {
+    if (area.locationId) return locations.find((l) => l.id === area.locationId)
+    if (area.dbName) return locations.find((l) => l.name === area.dbName)
+    return null
+  }
+
+  function getHorsesForArea(area) {
+    const loc = findDbLocation(area)
+    return loc ? horses.filter((h) => h.current_location === loc.id) : []
   }
 
   async function moveHorse(horse, targetLocation) {
-    // Check if target is a pasture and it's not the assigned pasture
-    if (
-      targetLocation.type === 'Pasture' &&
-      horse.assigned_pasture &&
-      horse.assigned_pasture !== targetLocation.id
-    ) {
-      const assignedPasture = locations.find((l) => l.id === horse.assigned_pasture)
-      setWarningModal({
-        horse,
-        targetLocation,
-        assignedPastureName: assignedPasture?.name || 'Unknown',
-      })
+    if (targetLocation.type === 'Pasture' && horse.assigned_pasture && horse.assigned_pasture !== targetLocation.id) {
+      const ap = locations.find((l) => l.id === horse.assigned_pasture)
+      setWarningModal({ horse, targetLocation, assignedPastureName: ap?.name || 'Unknown' })
       return
     }
-
     await confirmMove(horse, targetLocation)
   }
 
   async function confirmMove(horse, targetLocation) {
-    const { error } = await supabase
-      .from('horses')
-      .update({ current_location: targetLocation.id })
-      .eq('id', horse.id)
-
-    if (error) console.error('Error moving horse:', error)
-    setDraggingHorse(null)
-    setWarningModal(null)
+    const { error } = await supabase.from('horses').update({ current_location: targetLocation.id }).eq('id', horse.id)
+    if (error) console.error('Move error:', error)
+    setDraggingHorse(null); setWarningModal(null)
   }
 
-  const stalls = locations.filter((l) => l.type === 'Stall')
-  const pastures = locations.filter((l) => l.type === 'Pasture')
+  // Tap handling
+  function handleAreaTap(area) {
+    if (editMode) {
+      setSelectedArea(area); setEditLabel(area.label); setEditLocationId(area.locationId || '')
+      return
+    }
+    if (draggingHorse) {
+      const loc = findDbLocation(area)
+      if (loc && isAdmin) moveHorse(draggingHorse, loc)
+      return
+    }
+    setSelectedArea(selectedArea?.id === area.id ? null : area)
+  }
+
+  function handleHorseTap(e, horse) {
+    e.stopPropagation()
+    if (isAdmin && !editMode) setDraggingHorse(horse)
+  }
+
+  // Edit: rename area
+  function updateLabel(val) {
+    setMapAreas((p) => p.map((a) => a.id === selectedArea.id ? { ...a, label: val } : a))
+    setSelectedArea((p) => ({ ...p, label: val })); setEditLabel(val); setHasChanges(true)
+  }
+
+  // Edit: link area to location
+  function linkLocation(locId) {
+    setMapAreas((p) => p.map((a) => a.id === selectedArea.id ? { ...a, locationId: locId || null } : a))
+    setSelectedArea((p) => ({ ...p, locationId: locId || null })); setEditLocationId(locId); setHasChanges(true)
+  }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 text-amber-400 animate-spin" />
-      </div>
-    )
+    return <div className="flex items-center justify-center h-64"><RefreshCw className="w-6 h-6 text-amber-400 animate-spin" /></div>
   }
+
+  const parentAreas = mapAreas.filter((a) => !a.parent)
+  const stallAreas = mapAreas.filter((a) => a.parent)
 
   return (
     <div className="px-4 pt-4 pb-4">
-      <div className="flex items-center justify-between mb-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-xl font-bold text-amber-400">Facility Map</h1>
-          <p className="text-xs text-neutral-400">Tap a horse to move them</p>
+          <p className="text-xs text-neutral-400">
+            {editMode ? 'Drag to move · corner handles to resize · tap to edit' : 'Aerial view — tap areas to see horses'}
+          </p>
         </div>
-        <div className="flex gap-3 text-[10px] text-neutral-500">
-          <span className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-400" /> In Stall
-          </span>
-          <span className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-blue-400" /> In Pasture
-          </span>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            {editMode && hasChanges && (
+              <button onClick={saveLayout} className="flex items-center gap-1 text-[10px] bg-green-600 text-white px-2.5 py-1.5 rounded-lg font-semibold">
+                <Save className="w-3 h-3" /> Save
+              </button>
+            )}
+            <button
+              onClick={() => { setEditMode(!editMode); setSelectedArea(null) }}
+              className={`flex items-center gap-1 text-[10px] px-2.5 py-1.5 rounded-lg font-semibold transition ${
+                editMode ? 'bg-amber-500 text-black' : 'bg-neutral-800 text-neutral-400'
+              }`}
+            >
+              {editMode ? <><X className="w-3 h-3" /> Done</> : <><Pencil className="w-3 h-3" /> Edit Map</>}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Dragging indicator */}
-      {draggingHorse && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-4 flex items-center justify-between">
-          <p className="text-sm text-amber-400">
-            Moving <span className="font-semibold">{draggingHorse.name}</span> — tap a
-            destination
-          </p>
-          <button
-            onClick={() => setDraggingHorse(null)}
-            className="p-1 hover:bg-amber-500/20 rounded-lg"
-          >
-            <X className="w-4 h-4 text-amber-400" />
-          </button>
+      {/* Legend */}
+      {!editMode && (
+        <div className="flex gap-2 text-[9px] text-neutral-500 mb-3">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-700 border border-green-500 inline-block" /> Pasture</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-900 border border-amber-500 inline-block" /> Barn</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-900 border border-indigo-500 inline-block" /> Arena</span>
         </div>
       )}
 
-      {/* Stalls Section */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Home className="w-4 h-4 text-neutral-400" />
-          <h2 className="text-sm font-semibold text-neutral-300">Stalls</h2>
+      {/* Moving indicator */}
+      {draggingHorse && !editMode && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-3 flex items-center justify-between">
+          <p className="text-sm text-amber-400">Moving <span className="font-semibold">{draggingHorse.name}</span> — tap a destination</p>
+          <button onClick={() => setDraggingHorse(null)} className="p-1 hover:bg-amber-500/20 rounded-lg"><X className="w-4 h-4 text-amber-400" /></button>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {stalls.map((stall) => {
-            const horsesHere = getHorsesAtLocation(stall.id)
-            const homeHorses = getHorsesHomeStall(stall.id)
-            const isDropTarget = draggingHorse !== null
+      )}
+
+      {/* SVG Map */}
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
+        <svg
+          ref={svgRef} viewBox="0 0 1000 700" className="w-full"
+          style={{ touchAction: editMode ? 'none' : 'manipulation' }}
+          onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
+        >
+          <rect x="0" y="0" width="1000" height="700" fill="#0a0a0a" />
+
+          {[...parentAreas, ...stallAreas].map((area) => {
+            const idx = mapAreas.findIndex((a) => a.id === area.id)
+            const style = AREA_STYLES[area.type] || AREA_STYLES.building
+            const areaHorses = getHorsesForArea(area)
+            const isSelected = selectedArea?.id === area.id
+            const isDropTarget = !editMode && draggingHorse && (area.dbName || area.locationId)
+            const isStall = area.type === 'stall'
 
             return (
-              <div
-                key={stall.id}
-                onClick={() => {
-                  if (draggingHorse && isAdmin) {
-                    moveHorse(draggingHorse, stall)
-                  }
-                }}
-                className={`bg-neutral-900 border rounded-xl p-3 min-h-[80px] transition-all ${
-                  isDropTarget
-                    ? 'border-amber-500/50 bg-amber-500/10 cursor-pointer hover:border-amber-400'
-                    : 'border-neutral-800'
-                }`}
+              <g
+                key={area.id}
+                onClick={() => handleAreaTap(area)}
+                onPointerDown={(e) => editMode && onAreaPointerDown(e, idx)}
+                style={{ cursor: editMode ? 'move' : 'pointer' }}
               >
-                <p className="text-[10px] font-medium text-neutral-400 mb-1">
-                  {stall.name}
-                </p>
-                {/* Show home horse label */}
-                {homeHorses.map((h) => (
-                  <p
-                    key={h.id}
-                    className="text-[9px] text-neutral-500 italic mb-0.5"
-                  >
-                    Home: {h.name}
-                  </p>
-                ))}
-                {/* Show horses currently here */}
-                {horsesHere.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (isAdmin) setDraggingHorse(h)
-                    }}
-                    className={`block w-full text-left text-xs font-medium px-2 py-1 rounded-lg mt-0.5 transition ${
-                      draggingHorse?.id === h.id
-                        ? 'bg-amber-500/30 text-amber-300'
-                        : 'bg-green-900/40 text-green-400 hover:bg-green-900/60'
-                    }`}
-                  >
-                    {h.name}
-                  </button>
-                ))}
-                {horsesHere.length === 0 && homeHorses.length === 0 && (
-                  <p className="text-[10px] text-neutral-600 mt-1">Empty</p>
+                <rect
+                  x={area.x} y={area.y} width={area.w} height={area.h}
+                  rx={isStall ? 3 : 6}
+                  fill={isDropTarget ? '#451a0320' : style.fill}
+                  stroke={isSelected ? '#f59e0b' : isDropTarget ? '#f59e0b80' : style.stroke}
+                  strokeWidth={isSelected ? 2.5 : style.strokeW}
+                />
+                {/* Label */}
+                <text
+                  x={area.x + area.w / 2} y={isStall ? area.y + area.h / 2 + 3 : area.y + 16}
+                  textAnchor="middle" fontSize={isStall ? 8 : 11} fontWeight="700"
+                  fill={isSelected ? '#fbbf24' : style.textColor} opacity={0.9}
+                >
+                  {area.label}
+                </text>
+                {/* Horse count badge (non-stall) */}
+                {!editMode && !isStall && areaHorses.length > 0 && !isSelected && (
+                  <>
+                    <circle cx={area.x + area.w - 14} cy={area.y + 14} r={9} fill="#f59e0b" />
+                    <text x={area.x + area.w - 14} y={area.y + 18} textAnchor="middle" fontSize="10" fontWeight="800" fill="#000">{areaHorses.length}</text>
+                  </>
                 )}
-              </div>
+                {/* Stall: show horse name if occupied */}
+                {!editMode && isStall && areaHorses.length > 0 && (
+                  <text x={area.x + area.w / 2} y={area.y + area.h / 2 + 13} textAnchor="middle" fontSize="7" fontWeight="600" fill="#e5e5e5">
+                    {areaHorses[0].name}
+                  </text>
+                )}
+                {/* Stall: occupied highlight */}
+                {!editMode && isStall && areaHorses.length > 0 && (
+                  <rect x={area.x} y={area.y} width={area.w} height={area.h} rx={3} fill="#f59e0b" opacity={0.12} />
+                )}
+                {/* Horse names when selected (non-stall) */}
+                {!editMode && isSelected && !isStall && areaHorses.map((h, i) => (
+                  <g key={h.id} onClick={(e) => handleHorseTap(e, h)}>
+                    <rect x={area.x + 8} y={area.y + 26 + i * 22} width={area.w - 16} height={18} rx={4}
+                      fill={draggingHorse?.id === h.id ? '#f59e0b40' : '#ffffff15'}
+                      stroke={draggingHorse?.id === h.id ? '#f59e0b' : 'transparent'} strokeWidth={1}
+                    />
+                    <text x={area.x + 16} y={area.y + 39 + i * 22} fontSize="10" fontWeight="600"
+                      fill={draggingHorse?.id === h.id ? '#fbbf24' : '#e5e5e5'}
+                    >{h.name}</text>
+                  </g>
+                ))}
+                {/* Resize handles in edit mode */}
+                {editMode && isSelected && ['nw', 'ne', 'sw', 'se'].map((h) => {
+                  const hx = h.includes('e') ? area.x + area.w : area.x
+                  const hy = h.includes('s') ? area.y + area.h : area.y
+                  return (
+                    <rect key={h} x={hx - 5} y={hy - 5} width={10} height={10} rx={2}
+                      fill="#f59e0b" stroke="#000" strokeWidth={1}
+                      style={{ cursor: `${h}-resize` }}
+                      onPointerDown={(e) => onHandleDown(e, idx, h)}
+                    />
+                  )
+                })}
+              </g>
             )
           })}
-        </div>
+        </svg>
       </div>
 
-      {/* Pastures Section */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <TreePine className="w-4 h-4 text-green-400" />
-          <h2 className="text-sm font-semibold text-neutral-300">Pastures</h2>
+      {/* Edit panel */}
+      {editMode && selectedArea && (
+        <div className="mt-3 bg-neutral-900 border border-amber-500/30 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-amber-400">Edit: {selectedArea.label}</h3>
+            <button onClick={() => setSelectedArea(null)} className="p-1"><X className="w-4 h-4 text-neutral-500" /></button>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] text-neutral-500 uppercase font-semibold">Label</label>
+              <input type="text" value={editLabel} onChange={(e) => updateLabel(e.target.value)}
+                className="w-full mt-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-neutral-500 uppercase font-semibold">Link to Location</label>
+              <select value={editLocationId} onChange={(e) => linkLocation(e.target.value)}
+                className="w-full mt-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-amber-500/50"
+              >
+                <option value="">— None —</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[10px] text-neutral-600">Position: ({selectedArea.x}, {selectedArea.y}) · Size: {selectedArea.w}×{selectedArea.h}</p>
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {pastures.map((pasture) => {
-            const horsesHere = getHorsesAtLocation(pasture.id)
-            const assignedHorses = getHorsesAssignedPasture(pasture.id)
-            const isDropTarget = draggingHorse !== null
+      )}
 
+      {/* Detail panel (view mode) */}
+      {!editMode && selectedArea && (
+        <div className="mt-3 bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-amber-400">{selectedArea.label}</h3>
+            <button onClick={() => setSelectedArea(null)} className="p-1"><X className="w-4 h-4 text-neutral-500" /></button>
+          </div>
+          {(() => {
+            const areaHorses = getHorsesForArea(selectedArea)
+            if (areaHorses.length === 0) {
+              return <p className="text-xs text-neutral-500">{(selectedArea.dbName || selectedArea.locationId) ? 'No horses currently here.' : 'This area does not hold horses.'}</p>
+            }
             return (
-              <div
-                key={pasture.id}
-                onClick={() => {
-                  if (draggingHorse && isAdmin) {
-                    moveHorse(draggingHorse, pasture)
-                  }
-                }}
-                className={`bg-neutral-900 border rounded-xl p-3 min-h-[80px] transition-all ${
-                  isDropTarget
-                    ? 'border-blue-500/50 bg-blue-500/10 cursor-pointer hover:border-blue-400'
-                    : 'border-neutral-800'
-                }`}
-              >
-                <p className="text-[10px] font-medium text-neutral-400 mb-1">
-                  {pasture.name}
-                </p>
-                {/* Show assigned horses */}
-                {assignedHorses.map((h) => (
-                  <p
-                    key={`assigned-${h.id}`}
-                    className="text-[9px] text-neutral-500 italic mb-0.5"
-                  >
-                    Assigned: {h.name}
-                  </p>
-                ))}
-                {/* Show horses currently here */}
-                {horsesHere.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (isAdmin) setDraggingHorse(h)
-                    }}
-                    className={`block w-full text-left text-xs font-medium px-2 py-1 rounded-lg mt-0.5 transition ${
-                      draggingHorse?.id === h.id
-                        ? 'bg-amber-500/30 text-amber-300'
-                        : 'bg-blue-900/40 text-blue-400 hover:bg-blue-900/60'
+              <div className="space-y-1.5">
+                {areaHorses.map((h) => (
+                  <button key={h.id} onClick={() => isAdmin && setDraggingHorse(h)}
+                    className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
+                      draggingHorse?.id === h.id ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'
                     }`}
                   >
-                    {h.name}
+                    <span className="font-medium">{h.name}</span>
+                    {isAdmin && <span className="text-[9px] text-neutral-500 ml-auto">Tap to move</span>}
                   </button>
                 ))}
-                {horsesHere.length === 0 && assignedHorses.length === 0 && (
-                  <p className="text-[10px] text-neutral-600 mt-1">Empty</p>
-                )}
               </div>
             )
-          })}
-        </div>
-      </div>
-
-      {/* No data state */}
-      {locations.length === 0 && (
-        <div className="text-center py-16 text-neutral-500">
-          <MapPin className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="font-medium">No locations configured</p>
-          <p className="text-xs mt-1">Add stalls and pastures in the Admin panel.</p>
+          })()}
         </div>
       )}
 
@@ -272,24 +443,15 @@ export default function FacilityMap() {
             </div>
             <p className="text-sm text-neutral-400 mb-4">
               Are you sure? <span className="font-semibold">{warningModal.horse.name}</span>{' '}
-              is normally assigned to{' '}
-              <span className="font-semibold">{warningModal.assignedPastureName}</span>.
+              is normally assigned to <span className="font-semibold">{warningModal.assignedPastureName}</span>.
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setWarningModal(null)}
+              <button onClick={() => setWarningModal(null)}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-700 text-sm font-medium text-neutral-400 hover:bg-neutral-800 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() =>
-                  confirmMove(warningModal.horse, warningModal.targetLocation)
-                }
+              >Cancel</button>
+              <button onClick={() => confirmMove(warningModal.horse, warningModal.targetLocation)}
                 className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 text-black text-sm font-semibold hover:bg-amber-400 transition"
-              >
-                Move Anyway
-              </button>
+              >Move Anyway</button>
             </div>
           </div>
         </div>

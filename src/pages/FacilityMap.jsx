@@ -287,13 +287,33 @@ export default function FacilityMap() {
   // Horse helpers
   function findDbLocation(area) {
     if (area.locationId) return locations.find((l) => l.id === area.locationId)
-    if (area.dbName) return locations.find((l) => l.name === area.dbName)
+    if (area.dbName) {
+      // Exact match first
+      let loc = locations.find((l) => l.name === area.dbName)
+      if (loc) return loc
+      // Case-insensitive match
+      loc = locations.find((l) => l.name.toLowerCase() === area.dbName.toLowerCase())
+      if (loc) return loc
+      // Partial match (e.g. "Stall 1" matches "Stall 1" or "stall 1")
+      loc = locations.find((l) => l.name.toLowerCase().includes(area.dbName.toLowerCase()) || area.dbName.toLowerCase().includes(l.name.toLowerCase()))
+      return loc || null
+    }
+    // Try matching by label as last resort
+    if (area.label) {
+      return locations.find((l) => l.name.toLowerCase() === area.label.toLowerCase()) || null
+    }
     return null
   }
 
   function getHorsesForArea(area) {
     const loc = findDbLocation(area)
-    return loc ? horses.filter((h) => h.current_location === loc.id) : []
+    if (!loc) return []
+    // Show horse if it's currently here, OR this is their home stall, OR their assigned pasture
+    return horses.filter((h) =>
+      h.current_location === loc.id ||
+      h.home_stall === loc.id ||
+      h.assigned_pasture === loc.id
+    )
   }
 
   async function moveHorse(horse, targetLocation) {
@@ -467,22 +487,34 @@ export default function FacilityMap() {
                   </>
                 )}
                 {/* Pasture: always show horse names */}
-                {!editMode && isPasture && areaHorses.map((h, i) => {
-                  const nameStartY = area.y + area.h * 0.3
-                  const nameSpacing = Math.min(14, (area.h * 0.6) / Math.max(1, areaHorses.length))
-                  const nameFontSize = Math.min(9, area.w * 0.06, area.h * 0.08)
-                  return (
-                    <text key={h.id} x={area.x + area.w / 2} y={nameStartY + i * nameSpacing}
-                      textAnchor="middle" fontSize={nameFontSize} fontWeight="600" fill="#e5e5e5"
-                    >{h.name}</text>
-                  )
-                })}
+                {!editMode && isPasture && (() => {
+                  const loc = findDbLocation(area)
+                  return areaHorses.map((h, i) => {
+                    const nameStartY = area.y + area.h * 0.3
+                    const nameSpacing = Math.min(14, (area.h * 0.6) / Math.max(1, areaHorses.length))
+                    const nameFontSize = Math.min(9, area.w * 0.06, area.h * 0.08)
+                    const isHere = loc && h.current_location === loc.id
+                    return (
+                      <text key={h.id} x={area.x + area.w / 2} y={nameStartY + i * nameSpacing}
+                        textAnchor="middle" fontSize={nameFontSize} fontWeight="600"
+                        fill={isHere ? '#e5e5e5' : '#a8a29e'} opacity={isHere ? 1 : 0.6}
+                      >{h.name}{!isHere ? ' ⌂' : ''}</text>
+                    )
+                  })
+                })()}
                 {/* Stall: show horse name if occupied */}
-                {!editMode && isStall && areaHorses.length > 0 && (
-                  <text x={area.x + area.w / 2} y={area.y + area.h * 0.75} textAnchor="middle" fontSize={Math.min(7, area.w * 0.2, area.h * 0.2)} fontWeight="600" fill="#e5e5e5">
-                    {areaHorses[0].name}
-                  </text>
-                )}
+                {!editMode && isStall && areaHorses.length > 0 && (() => {
+                  const loc = findDbLocation(area)
+                  return areaHorses.map((h, i) => {
+                    const isHere = loc && h.current_location === loc.id
+                    return (
+                      <text key={h.id} x={area.x + area.w / 2} y={area.y + area.h * 0.75 + i * Math.min(10, area.h * 0.15)}
+                        textAnchor="middle" fontSize={Math.min(7, area.w * 0.2, area.h * 0.15)} fontWeight="600"
+                        fill={isHere ? '#e5e5e5' : '#a8a29e'} opacity={isHere ? 1 : 0.6}
+                      >{h.name}{!isHere ? ' ⌂' : ''}</text>
+                    )
+                  })
+                })()}
                 {/* Stall: occupied highlight */}
                 {!editMode && isStall && areaHorses.length > 0 && (
                   <rect x={area.x} y={area.y} width={area.w} height={area.h} rx={3} fill="#f59e0b" opacity={0.12} />

@@ -86,6 +86,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-950">
         <div className="text-center animate-fade-in">
+          <img src="/logo.png" alt="Imperial Sporthorses" className="h-16 w-auto mx-auto mb-4 opacity-80" />
           <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mx-auto mb-3" />
           <p className="text-sm text-neutral-400">Loading...</p>
         </div>

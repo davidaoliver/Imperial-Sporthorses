@@ -12,6 +12,17 @@ export function AuthProvider({ children }) {
   const [authReady, setAuthReady] = useState(false)
   const fetchingRef = useRef(false)
 
+  // Safety timeout: never stay loading for more than 8 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn('[Auth] Safety timeout — forcing loading=false')
+        setLoading(false)
+      }
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [loading])
+
   // Effect 1: Track auth session ONLY. No database calls here.
   useEffect(() => {
     if (!isConfigured) {
@@ -53,14 +64,17 @@ export function AuthProvider({ children }) {
       return
     }
 
-    if (fetchingRef.current) return
-    fetchingRef.current = true
+    // Reset fetchingRef when session changes so retries work
+    fetchingRef.current = false
 
     const userId = session.user.id
     const userEmail = session.user.email
 
-    async function loadProfile() {
-      console.log('[Auth] Fetching profile for:', userId)
+    async function loadProfile(attempt = 1) {
+      if (fetchingRef.current) return
+      fetchingRef.current = true
+
+      console.log(`[Auth] Fetching profile for: ${userId} (attempt ${attempt})`)
       try {
         const { data, error } = await supabase
           .from('users')
@@ -69,22 +83,35 @@ export function AuthProvider({ children }) {
           .single()
 
         if (error && error.code === 'PGRST116') {
-          console.log('[Auth] No profile found, creating one...')
-          const { data: newProfile, error: insertErr } = await supabase
+          console.log('[Auth] No profile found, upserting...')
+          // Use upsert to handle race condition with handle_new_user trigger
+          const { data: newProfile, error: upsertErr } = await supabase
             .from('users')
-            .insert({ id: userId, email: userEmail })
+            .upsert({ id: userId, email: userEmail }, { onConflict: 'id' })
             .select()
             .single()
 
-          if (insertErr) {
-            console.error('[Auth] Failed to create profile:', insertErr.message)
+          if (upsertErr) {
+            console.error('[Auth] Failed to upsert profile:', upsertErr.message)
+            // Retry: the trigger might have created it, try fetching again
+            if (attempt < 3) {
+              fetchingRef.current = false
+              setTimeout(() => loadProfile(attempt + 1), 1000)
+              return
+            }
             setProfile(null)
           } else {
-            console.log('[Auth] New profile created')
+            console.log('[Auth] Profile upserted')
             setProfile(newProfile)
           }
         } else if (error) {
           console.warn('[Auth] Profile fetch error:', error.message)
+          // Retry on network errors
+          if (attempt < 3) {
+            fetchingRef.current = false
+            setTimeout(() => loadProfile(attempt + 1), 1500)
+            return
+          }
           setProfile(null)
         } else {
           console.log('[Auth] Profile loaded:', data?.display_name)
@@ -92,10 +119,15 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error('[Auth] Profile fetch exception:', err)
+        if (attempt < 3) {
+          fetchingRef.current = false
+          setTimeout(() => loadProfile(attempt + 1), 1500)
+          return
+        }
         setProfile(null)
       } finally {
-        setLoading(false)
         fetchingRef.current = false
+        setLoading(false)
       }
     }
 

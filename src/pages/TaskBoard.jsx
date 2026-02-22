@@ -229,7 +229,7 @@ export default function TaskBoard() {
         ))}
       </div>
 
-      {/* Task list */}
+      {/* Task list grouped by assignee */}
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-neutral-500">
           <ListChecks className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -243,75 +243,102 @@ export default function TaskBoard() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((task) => {
-            const style = STATUS_STYLES[task.status]
-            const StatusIcon = style.icon
-            const isMyTask = task.assigned_to === profile?.id
-            const assignee = getAssigneeName(task)
-
-            return (
-              <div
-                key={task.id}
-                onClick={() => handleTaskTap(task)}
-                className={`${style.bg} border ${style.border} rounded-xl p-3 flex items-center gap-3 transition-all active:scale-[0.98] cursor-pointer ${
-                  isMyTask ? 'ring-1 ring-amber-500/30' : ''
-                }`}
-              >
-                <StatusIcon className={`w-5 h-5 ${style.iconColor} shrink-0`} />
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm font-medium ${
-                      task.status === 'Done'
-                        ? 'text-neutral-500 line-through'
-                        : 'text-neutral-100'
-                    }`}
-                  >
-                    {task.title}
-                  </p>
-                  <p className="text-[10px] text-neutral-500 mt-0.5">
-                    {assignee || (
-                      <span className="text-neutral-600 italic">Unassigned</span>
-                    )}
-                    {isMyTask && (
-                      <span className="text-amber-500/70"> · You</span>
-                    )}
-                    {task.completed_at &&
-                      ` · Done ${format(new Date(task.completed_at), 'MMM d, h:mm a')}`}
-                  </p>
+        <div className="space-y-4">
+          {(() => {
+            // Group tasks by assignee
+            const groups = {}
+            filtered.forEach((task) => {
+              const name = getAssigneeName(task) || '_unassigned'
+              if (!groups[name]) groups[name] = []
+              groups[name].push(task)
+            })
+            // Sort: assigned people first (alphabetical), unassigned last
+            const sortedKeys = Object.keys(groups).sort((a, b) => {
+              if (a === '_unassigned') return 1
+              if (b === '_unassigned') return -1
+              return a.localeCompare(b)
+            })
+            return sortedKeys.map((groupName) => (
+              <div key={groupName}>
+                <div className={`flex items-center gap-2 mb-2 px-1 ${
+                  groupName !== '_unassigned' ? 'border-l-2 border-amber-500 pl-2' : 'pl-3'
+                }`}>
+                  <span className={`text-xs font-bold uppercase tracking-wide ${
+                    groupName !== '_unassigned' ? 'text-amber-400' : 'text-neutral-600'
+                  }`}>
+                    {groupName === '_unassigned' ? 'Unassigned' : groupName}
+                  </span>
+                  <span className="text-[10px] text-neutral-600">{groups[groupName].length}</span>
                 </div>
-                <span
-                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${style.badge}`}
-                >
-                  {task.status}
-                </span>
-                {isAdmin && (
-                  <div className="flex items-center gap-0.5">
-                    {task.status !== 'Done' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setEditingTask(task)
-                        }}
-                        className="p-1 rounded-lg hover:bg-neutral-700 transition"
+                <div className="space-y-2">
+                  {groups[groupName].map((task) => {
+                    const style = STATUS_STYLES[task.status]
+                    const StatusIcon = style.icon
+                    const isMyTask = task.assigned_to === profile?.id
+
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => handleTaskTap(task)}
+                        className={`${style.bg} border ${style.border} rounded-xl p-3 flex items-center gap-3 transition-all active:scale-[0.98] cursor-pointer ${
+                          isMyTask ? 'ring-1 ring-amber-500/30' : ''
+                        }`}
                       >
-                        <Pencil className="w-3.5 h-3.5 text-neutral-500" />
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (confirm('Delete this task?')) handleDeleteTask(task.id)
-                      }}
-                      className="p-1 rounded-lg hover:bg-neutral-700 transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
-                    </button>
-                  </div>
-                )}
+                        <StatusIcon className={`w-5 h-5 ${style.iconColor} shrink-0`} />
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-sm font-medium ${
+                              task.status === 'Done'
+                                ? 'text-neutral-500 line-through'
+                                : 'text-neutral-100'
+                            }`}
+                          >
+                            {task.title}
+                          </p>
+                          <p className="text-[10px] text-neutral-500 mt-0.5">
+                            {isMyTask && (
+                              <span className="text-amber-500/70">You</span>
+                            )}
+                            {task.completed_at &&
+                              `${isMyTask ? ' · ' : ''}Done ${format(new Date(task.completed_at), 'MMM d, h:mm a')}`}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${style.badge}`}
+                        >
+                          {task.status}
+                        </span>
+                        {isAdmin && (
+                          <div className="flex items-center gap-0.5">
+                            {task.status !== 'Done' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingTask(task)
+                                }}
+                                className="p-1 rounded-lg hover:bg-neutral-700 transition"
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-neutral-500" />
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (confirm('Delete this task?')) handleDeleteTask(task.id)
+                              }}
+                              className="p-1 rounded-lg hover:bg-neutral-700 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            )
-          })}
+            ))
+          })()}
         </div>
       )}
 

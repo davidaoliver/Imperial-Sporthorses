@@ -102,6 +102,28 @@ export default function AdminSettings() {
     fetchAll()
   }
 
+  // Auto-create all stalls and pastures to match the facility map
+  async function syncMapLocations() {
+    const needed = [
+      ...Array.from({ length: 22 }, (_, i) => ({ name: `Stall ${i + 1}`, type: 'Stall' })),
+      { name: 'Pasture #1', type: 'Pasture' },
+      { name: 'Pasture #2', type: 'Pasture' },
+      { name: 'Pasture #3', type: 'Pasture' },
+      { name: 'Pasture #4', type: 'Pasture' },
+      { name: 'Pasture #5', type: 'Pasture' },
+    ]
+    const existing = locations.map((l) => l.name)
+    const toCreate = needed.filter((n) => !existing.includes(n.name))
+    if (toCreate.length === 0) return
+    const { error } = await supabase.from('locations').insert(toCreate)
+    if (error) {
+      console.error('Sync error:', error)
+      alert('Failed to sync: ' + error.message)
+    } else {
+      fetchAll()
+    }
+  }
+
   // --- Horses ---
   async function addHorse(e) {
     e.preventDefault()
@@ -283,7 +305,15 @@ export default function AdminSettings() {
 
       {activeSection === 'locations' && (
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-neutral-300 mb-3">Stalls & Pastures</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-neutral-300">Stalls & Pastures</h3>
+            <button
+              onClick={syncMapLocations}
+              className="text-[10px] font-semibold bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-lg hover:bg-amber-500/30 transition"
+            >
+              Sync with Map
+            </button>
+          </div>
           <form onSubmit={addLocation} className="flex gap-2 mb-4">
             <input
               type="text"

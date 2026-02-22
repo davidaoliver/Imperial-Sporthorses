@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -8,6 +8,9 @@ import {
   RefreshCw,
   Trash2,
   X,
+  Circle,
+  Move,
+  Save,
 } from 'lucide-react'
 import { format, differenceInDays, parseISO } from 'date-fns'
 
@@ -15,10 +18,14 @@ export default function FeedRoom() {
   const { isAdmin } = useAuth()
   const [horses, setHorses] = useState([])
   const [inventory, setInventory] = useState([])
+  const [bowls, setBowls] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState('chart')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showInventoryModal, setShowInventoryModal] = useState(false)
+  const [bowlEditMode, setBowlEditMode] = useState(false)
+  const [draggingBowl, setDraggingBowl] = useState(null)
+  const bowlSvgRef = useRef(null)
   const [newItem, setNewItem] = useState({
     feed_name: '',
     quantity: '',
@@ -29,12 +36,14 @@ export default function FeedRoom() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [horseRes, invRes] = await Promise.all([
+      const [horseRes, invRes, bowlRes] = await Promise.all([
         supabase.from('horses').select('*').order('name'),
         supabase.from('feed_inventory').select('*').order('expiration_date', { ascending: true }),
+        supabase.from('feed_bowls').select('*').order('bowl_number', { ascending: true }),
       ])
       setHorses(horseRes.data || [])
       setInventory(invRes.data || [])
+      setBowls(bowlRes.data || [])
     } catch (err) {
       console.error('fetchData exception:', err)
     } finally {
@@ -50,6 +59,9 @@ export default function FeedRoom() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_inventory' }, () =>
         fetchData()
       )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feed_bowls' }, () =>
+        fetchData()
+      )
       .subscribe()
 
     return () => supabase.removeChannel(channel)
@@ -62,6 +74,48 @@ export default function FeedRoom() {
     if (days <= 14)
       return { class: 'bg-yellow-900/40 text-yellow-400', label: `${days}d left` }
     return { class: 'bg-green-900/40 text-green-400', label: `${days}d left` }
+  }
+
+  // --- Bowl drag handlers ---
+  function getSvgPoint(e) {
+    const svg = bowlSvgRef.current
+    if (!svg) return { x: 0, y: 0 }
+    const pt = svg.createSVGPoint()
+    pt.x = e.clientX; pt.y = e.clientY
+    const ctm = svg.getScreenCTM().inverse()
+    const svgP = pt.matrixTransform(ctm)
+    return { x: svgP.x, y: svgP.y }
+  }
+
+  function onBowlPointerDown(e, bowlId) {
+    if (!bowlEditMode) return
+    e.preventDefault()
+    e.stopPropagation()
+    const pt = getSvgPoint(e)
+    const bowl = bowls.find(b => b.id === bowlId)
+    if (!bowl) return
+    setDraggingBowl({ id: bowlId, offsetX: pt.x - bowl.x, offsetY: pt.y - bowl.y })
+  }
+
+  function onBowlPointerMove(e) {
+    if (!draggingBowl) return
+    const pt = getSvgPoint(e)
+    setBowls(prev => prev.map(b =>
+      b.id === draggingBowl.id
+        ? { ...b, x: Math.round(pt.x - draggingBowl.offsetX), y: Math.round(pt.y - draggingBowl.offsetY) }
+        : b
+    ))
+  }
+
+  function onBowlPointerUp() {
+    setDraggingBowl(null)
+  }
+
+  async function saveBowlPositions() {
+    for (const b of bowls) {
+      await supabase.from('feed_bowls').update({ x: b.x, y: b.y }).eq('id', b.id)
+    }
+    setBowlEditMode(false)
   }
 
   async function handleAddDelivery(e) {
@@ -123,6 +177,25 @@ export default function FeedRoom() {
             </button>
           </div>
         )}
+        {activeSection === 'bowls' && isAdmin && (
+          bowlEditMode ? (
+            <button
+              onClick={saveBowlPositions}
+              className="flex items-center gap-1.5 text-xs bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg font-medium hover:bg-green-500/30 transition"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Save Layout
+            </button>
+          ) : (
+            <button
+              onClick={() => setBowlEditMode(true)}
+              className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-500/30 transition"
+            >
+              <Move className="w-3.5 h-3.5" />
+              Edit Layout
+            </button>
+          )
+        )}
       </div>
 
       {/* Section Toggle */}
@@ -148,6 +221,17 @@ export default function FeedRoom() {
         >
           <Package className="w-3.5 h-3.5" />
           Inventory
+        </button>
+        <button
+          onClick={() => setActiveSection('bowls')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+            activeSection === 'bowls'
+              ? 'bg-neutral-800 text-amber-400 shadow-sm'
+              : 'text-neutral-500'
+          }`}
+        >
+          <Circle className="w-3.5 h-3.5" />
+          Feed Order
         </button>
       </div>
 
@@ -270,6 +354,79 @@ export default function FeedRoom() {
                 )
               })}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Feed Order — Bowl Map */}
+      {activeSection === 'bowls' && (
+        <div>
+          {bowls.length === 0 ? (
+            <div className="text-center py-16 text-neutral-500">
+              <Circle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="font-medium">No bowls configured</p>
+              <p className="text-xs mt-1">Add bowls in Admin → Feed Order.</p>
+            </div>
+          ) : (
+            <>
+              {bowlEditMode && (
+                <p className="text-[10px] text-amber-400 text-center mb-2">Drag bowls to rearrange • Tap Save when done</p>
+              )}
+              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
+                <svg
+                  ref={bowlSvgRef}
+                  viewBox="0 0 400 300"
+                  className="w-full"
+                  style={{ touchAction: bowlEditMode ? 'none' : 'manipulation' }}
+                  onPointerMove={onBowlPointerMove}
+                  onPointerUp={onBowlPointerUp}
+                  onPointerLeave={onBowlPointerUp}
+                >
+                  <rect x="0" y="0" width="400" height="300" fill="#0a0a0a" />
+                  <text x="200" y="20" textAnchor="middle" fontSize="10" fill="#525252" fontWeight="600">Feed Room Floor</text>
+
+                  {bowls.map((bowl) => {
+                    const horse = bowl.horse_id ? horses.find(h => h.id === bowl.horse_id) : null
+                    const hasHorse = !!horse
+                    return (
+                      <g
+                        key={bowl.id}
+                        onPointerDown={(e) => onBowlPointerDown(e, bowl.id)}
+                        style={{ cursor: bowlEditMode ? 'move' : 'default' }}
+                      >
+                        <circle
+                          cx={bowl.x} cy={bowl.y} r={28}
+                          fill={hasHorse ? '#451a0340' : '#17171740'}
+                          stroke={hasHorse ? '#d97706' : '#525252'}
+                          strokeWidth={bowlEditMode ? 2.5 : 1.5}
+                          strokeDasharray={bowlEditMode ? '4 2' : 'none'}
+                        />
+                        <text
+                          x={bowl.x} y={bowl.y - 6}
+                          textAnchor="middle" fontSize="9" fontWeight="700"
+                          fill={hasHorse ? '#fbbf24' : '#737373'}
+                        >
+                          Bowl {bowl.bowl_number}
+                        </text>
+                        <text
+                          x={bowl.x} y={bowl.y + 8}
+                          textAnchor="middle" fontSize="8" fontWeight="600"
+                          fill={hasHorse ? '#e5e5e5' : '#525252'}
+                        >
+                          {horse ? horse.name : '— empty —'}
+                        </text>
+                        {bowlEditMode && (
+                          <circle cx={bowl.x} cy={bowl.y} r={28} fill="transparent" stroke="#f59e0b" strokeWidth={0.5} opacity={0.5} />
+                        )}
+                      </g>
+                    )
+                  })}
+                </svg>
+              </div>
+              {!bowlEditMode && (
+                <p className="text-[10px] text-neutral-600 text-center mt-2">Assign horses to bowls in Admin → Feed Order</p>
+              )}
+            </>
           )}
         </div>
       )}

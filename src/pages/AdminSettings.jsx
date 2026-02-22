@@ -10,6 +10,7 @@ import {
   Plus,
   Trash2,
   Target,
+  Circle,
   LogOut,
   ChevronDown,
   ChevronRight,
@@ -27,6 +28,7 @@ export default function AdminSettings() {
   const [templates, setTemplates] = useState([])
   const [schedule, setSchedule] = useState([])
   const [boardTasks, setBoardTasks] = useState([])
+  const [feedBowls, setFeedBowls] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Form states
@@ -49,16 +51,18 @@ export default function AdminSettings() {
     shift: 'AM',
   })
   const [newBoardTask, setNewBoardTask] = useState({ title: '', assigned_to: '' })
+  const [newBowlHorse, setNewBowlHorse] = useState({})
 
   const fetchAll = useCallback(async () => {
     try {
-      const [uRes, lRes, hRes, tRes, sRes, bRes] = await Promise.all([
+      const [uRes, lRes, hRes, tRes, sRes, bRes, bowlRes] = await Promise.all([
         supabase.from('users').select('*').order('display_name'),
         supabase.from('locations').select('*').order('type').order('name'),
         supabase.from('horses').select('*').order('name'),
         supabase.from('task_templates').select('*').order('shift').order('sort_order'),
         supabase.from('weekly_schedule').select('*, user:users!weekly_schedule_user_id_fkey(display_name)'),
         supabase.from('tasks').select('*, assigned_user:users!tasks_assigned_to_fkey(display_name)').is('shift', null).order('sort_order', { ascending: true }),
+        supabase.from('feed_bowls').select('*').order('bowl_number', { ascending: true }),
       ])
       setUsers(uRes.data || [])
       setLocations(lRes.data || [])
@@ -66,6 +70,7 @@ export default function AdminSettings() {
       setTemplates(tRes.data || [])
       setSchedule(sRes.data || [])
       setBoardTasks(bRes.data || [])
+      setFeedBowls(bowlRes.data || [])
     } catch (err) {
       console.error('fetchAll exception:', err)
     } finally {
@@ -239,6 +244,7 @@ export default function AdminSettings() {
     { id: 'templates', label: 'Task Templates', icon: ClipboardList },
     { id: 'schedule', label: 'Weekly Schedule', icon: Calendar },
     { id: 'board', label: 'Board Tasks', icon: Target },
+    { id: 'feedorder', label: 'Feed Order', icon: Circle },
   ]
 
   return (
@@ -634,6 +640,71 @@ export default function AdminSettings() {
             ))}
             {boardTasks.length === 0 && (
               <p className="text-xs text-neutral-500 text-center py-4">No board tasks yet. Add one above.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'feedorder' && (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-neutral-300">Feed Bowls</h3>
+            <button
+              onClick={async () => {
+                const nextNum = feedBowls.length + 1
+                const col = ((nextNum - 1) % 4)
+                const row = Math.floor((nextNum - 1) / 4)
+                await supabase.from('feed_bowls').insert({
+                  bowl_number: nextNum,
+                  horse_id: null,
+                  x: 60 + col * 90,
+                  y: 60 + row * 80,
+                })
+                fetchAll()
+              }}
+              className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-500/30 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Bowl
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {feedBowls.map((bowl) => {
+              const horse = bowl.horse_id ? horses.find(h => h.id === bowl.horse_id) : null
+              return (
+                <div key={bowl.id} className="flex items-center gap-2 py-2 border-b border-neutral-800 last:border-0">
+                  <span className="text-sm text-amber-400 font-semibold w-16 shrink-0">Bowl {bowl.bowl_number}</span>
+                  <select
+                    value={bowl.horse_id || ''}
+                    onChange={async (e) => {
+                      await supabase.from('feed_bowls').update({ horse_id: e.target.value || null }).eq('id', bowl.id)
+                      fetchAll()
+                    }}
+                    className={`flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                      horse ? 'text-amber-300' : 'text-neutral-500'
+                    }`}
+                  >
+                    <option value="">— Empty —</option>
+                    {horses.map(h => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Delete Bowl ${bowl.bowl_number}?`)) return
+                      await supabase.from('feed_bowls').delete().eq('id', bowl.id)
+                      fetchAll()
+                    }}
+                    className="p-1 text-neutral-600 hover:text-red-400 transition shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )
+            })}
+            {feedBowls.length === 0 && (
+              <p className="text-xs text-neutral-500 text-center py-4">No bowls yet. Tap "Add Bowl" to create one.</p>
             )}
           </div>
         </div>

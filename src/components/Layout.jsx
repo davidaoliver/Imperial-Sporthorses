@@ -6,8 +6,11 @@ import {
   MessageSquare,
   Wheat,
   Settings,
+  CalendarDays,
+  ListChecks,
 } from 'lucide-react'
 import TaskBoard from '../pages/TaskBoard'
+import WeeklyPlanner from '../pages/WeeklyPlanner'
 import FacilityMap from '../pages/FacilityMap'
 import Chat from '../pages/Chat'
 import FeedRoom from '../pages/FeedRoom'
@@ -22,12 +25,42 @@ const TABS = [
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState('tasks')
+  const [tasksView, setTasksView] = useState('weekly') // 'weekly' or 'board'
   const { isAdmin } = useAuth()
 
   function renderTab() {
     switch (activeTab) {
       case 'tasks':
-        return <TaskBoard />
+        return (
+          <div>
+            {/* Sub-tabs for Tasks */}
+            <div className="flex items-center gap-1 px-4 pt-3 pb-1">
+              <button
+                onClick={() => setTasksView('weekly')}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+                  tasksView === 'weekly'
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'bg-neutral-800/60 text-neutral-400 hover:text-neutral-300'
+                }`}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                Weekly
+              </button>
+              <button
+                onClick={() => setTasksView('board')}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+                  tasksView === 'board'
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'bg-neutral-800/60 text-neutral-400 hover:text-neutral-300'
+                }`}
+              >
+                <ListChecks className="w-3.5 h-3.5" />
+                Board
+              </button>
+            </div>
+            {tasksView === 'weekly' ? <WeeklyPlanner /> : <TaskBoard />}
+          </div>
+        )
       case 'map':
         return <FacilityMap />
       case 'chat':

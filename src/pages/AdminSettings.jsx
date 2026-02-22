@@ -9,6 +9,7 @@ import {
   Calendar,
   Plus,
   Trash2,
+  Target,
   LogOut,
   ChevronDown,
   ChevronRight,
@@ -25,6 +26,7 @@ export default function AdminSettings() {
   const [horses, setHorses] = useState([])
   const [templates, setTemplates] = useState([])
   const [schedule, setSchedule] = useState([])
+  const [boardTasks, setBoardTasks] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Form states
@@ -46,21 +48,24 @@ export default function AdminSettings() {
     day_of_week: 0,
     shift: 'AM',
   })
+  const [newBoardTask, setNewBoardTask] = useState({ title: '', assigned_to: '' })
 
   const fetchAll = useCallback(async () => {
     try {
-      const [uRes, lRes, hRes, tRes, sRes] = await Promise.all([
+      const [uRes, lRes, hRes, tRes, sRes, bRes] = await Promise.all([
         supabase.from('users').select('*').order('display_name'),
         supabase.from('locations').select('*').order('type').order('name'),
         supabase.from('horses').select('*').order('name'),
         supabase.from('task_templates').select('*').order('shift').order('sort_order'),
         supabase.from('weekly_schedule').select('*, user:users!weekly_schedule_user_id_fkey(display_name)'),
+        supabase.from('tasks').select('*, assigned_user:users!tasks_assigned_to_fkey(display_name)').is('shift', null).order('sort_order', { ascending: true }),
       ])
       setUsers(uRes.data || [])
       setLocations(lRes.data || [])
       setHorses(hRes.data || [])
       setTemplates(tRes.data || [])
       setSchedule(sRes.data || [])
+      setBoardTasks(bRes.data || [])
     } catch (err) {
       console.error('fetchAll exception:', err)
     } finally {
@@ -162,6 +167,34 @@ export default function AdminSettings() {
     fetchAll()
   }
 
+  // --- Board Tasks ---
+  async function addBoardTask(e) {
+    e.preventDefault()
+    if (!newBoardTask.title.trim()) return
+    const { format } = await import('date-fns')
+    const { error } = await supabase.from('tasks').insert({
+      title: newBoardTask.title.trim(),
+      shift: null,
+      status: 'Pending',
+      task_date: format(new Date(), 'yyyy-MM-dd'),
+      assigned_to: newBoardTask.assigned_to || null,
+      sort_order: 0,
+    })
+    if (error) {
+      console.error('[Admin] Failed to create board task:', error)
+      alert('Failed to create task: ' + error.message)
+      return
+    }
+    setNewBoardTask({ title: '', assigned_to: '' })
+    fetchAll()
+  }
+
+  async function deleteBoardTask(id) {
+    if (!confirm('Delete this board task?')) return
+    await supabase.from('tasks').delete().eq('id', id)
+    fetchAll()
+  }
+
   const stalls = locations.filter((l) => l.type === 'Stall')
   const pastures = locations.filter((l) => l.type === 'Pasture')
 
@@ -171,6 +204,7 @@ export default function AdminSettings() {
     { id: 'horses', label: 'Horses', icon: Beef },
     { id: 'templates', label: 'Task Templates', icon: ClipboardList },
     { id: 'schedule', label: 'Weekly Schedule', icon: Calendar },
+    { id: 'board', label: 'Board Tasks', icon: Target },
   ]
 
   return (
@@ -469,6 +503,61 @@ export default function AdminSettings() {
           {schedule.length === 0 && (
             <p className="text-xs text-neutral-500 text-center py-4">No schedule entries yet.</p>
           )}
+        </div>
+      )}
+      {activeSection === 'board' && (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-neutral-300 mb-3">Board Tasks</h3>
+          <p className="text-[10px] text-neutral-500 mb-3">General goals &amp; assignments that appear on the Task Board.</p>
+          <form onSubmit={addBoardTask} className="space-y-2 mb-4">
+            <input
+              type="text"
+              value={newBoardTask.title}
+              onChange={(e) => setNewBoardTask({ ...newBoardTask, title: e.target.value })}
+              placeholder="What needs to get done?"
+              className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <div className="flex gap-2">
+              <select
+                value={newBoardTask.assigned_to}
+                onChange={(e) => setNewBoardTask({ ...newBoardTask, assigned_to: e.target.value })}
+                className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">Unassigned</option>
+                {users.filter(u => u.display_name).map((u) => (
+                  <option key={u.id} value={u.id}>{u.display_name}</option>
+                ))}
+              </select>
+              <button type="submit" className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-semibold">
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
+          <div className="space-y-2">
+            {boardTasks.map((task) => (
+              <div key={task.id} className="flex items-center justify-between py-2 border-b border-neutral-800 last:border-0">
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${task.status === 'Done' ? 'text-neutral-500 line-through' : 'text-neutral-100'}`}>
+                    {task.title}
+                  </p>
+                  <p className="text-[10px] text-neutral-500">
+                    {task.assigned_user?.display_name || 'Unassigned'}
+                    <span className={`ml-1.5 ${
+                      task.status === 'Done' ? 'text-green-500' : task.status === 'In Progress' ? 'text-yellow-500' : 'text-red-500'
+                    }`}>
+                      · {task.status}
+                    </span>
+                  </p>
+                </div>
+                <button onClick={() => deleteBoardTask(task.id)} className="p-1 text-neutral-500 hover:text-red-400 shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            {boardTasks.length === 0 && (
+              <p className="text-xs text-neutral-500 text-center py-4">No board tasks yet. Add one above.</p>
+            )}
+          </div>
         </div>
       )}
     </div>

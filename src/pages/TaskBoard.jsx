@@ -7,18 +7,12 @@ import {
   Circle,
   Pencil,
   RefreshCw,
-  Sun,
-  Sunset,
-  Moon,
+  Trash2,
   X,
+  ListChecks,
+  Target,
 } from 'lucide-react'
 import { format } from 'date-fns'
-
-const SHIFT_CONFIG = {
-  AM: { icon: Sun, iconClass: 'text-amber-500', label: 'Morning' },
-  'Mid-Day': { icon: Sunset, iconClass: 'text-orange-500', label: 'Mid-Day' },
-  PM: { icon: Moon, iconClass: 'text-indigo-500', label: 'Evening' },
-}
 
 const STATUS_STYLES = {
   Pending: {
@@ -44,35 +38,46 @@ const STATUS_STYLES = {
   },
 }
 
+const FILTER_TABS = [
+  { key: 'active', label: 'Active' },
+  { key: 'done', label: 'Completed' },
+  { key: 'all', label: 'All' },
+]
+
 export default function TaskBoard() {
   const { profile, isAdmin } = useAuth()
   const [tasks, setTasks] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingTask, setEditingTask] = useState(null)
+  const [filterTab, setFilterTab] = useState('active')
 
   const fetchTasks = useCallback(async () => {
     try {
-      const today = format(new Date(), 'yyyy-MM-dd')
+      console.log('[TaskBoard] Fetching board tasks...')
+      // Try with join first
       const { data, error } = await supabase
         .from('tasks')
         .select('*, assigned_user:users!tasks_assigned_to_fkey(display_name)')
-        .eq('task_date', today)
+        .is('shift', null)
         .order('sort_order', { ascending: true })
 
       if (error) {
-        console.error('Error fetching tasks:', error)
-        const { data: fallbackData } = await supabase
+        console.warn('[TaskBoard] Join query failed:', error.message)
+        // Fallback without join
+        const { data: fallbackData, error: fbErr } = await supabase
           .from('tasks')
           .select('*')
-          .eq('task_date', today)
+          .is('shift', null)
           .order('sort_order', { ascending: true })
+        console.log('[TaskBoard] Fallback result:', fallbackData?.length, fbErr?.message)
         setTasks(fallbackData || [])
       } else {
+        console.log('[TaskBoard] Loaded', data?.length, 'board tasks')
         setTasks(data || [])
       }
     } catch (err) {
-      console.error('fetchTasks exception:', err)
+      console.error('[TaskBoard] fetchTasks exception:', err)
       setTasks([])
     } finally {
       setLoading(false)
@@ -91,9 +96,8 @@ export default function TaskBoard() {
     fetchTasks()
     fetchUsers()
 
-    // Realtime subscription
     const channel = supabase
-      .channel('tasks-realtime')
+      .channel('board-tasks-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks' },
@@ -107,20 +111,22 @@ export default function TaskBoard() {
   }, [fetchTasks, fetchUsers])
 
   async function handleTaskTap(task) {
-    if (task.status === 'Done') return
-
-    let newStatus, updates
+    let updates
     if (task.status === 'Pending') {
-      newStatus = 'In Progress'
       updates = {
-        status: newStatus,
-        assigned_to: profile.id,
+        status: 'In Progress',
+        assigned_to: task.assigned_to || profile.id,
       }
     } else if (task.status === 'In Progress') {
-      newStatus = 'Done'
       updates = {
-        status: newStatus,
+        status: 'Done',
         completed_at: new Date().toISOString(),
+      }
+    } else if (task.status === 'Done') {
+      // Undo — revert back to In Progress
+      updates = {
+        status: 'In Progress',
+        completed_at: null,
       }
     }
 
@@ -142,20 +148,9 @@ export default function TaskBoard() {
     setEditingTask(null)
   }
 
-  async function generateDailyTasks() {
-    const { error } = await supabase.rpc('generate_daily_tasks')
-    if (error) {
-      console.error('Error generating tasks:', error)
-      alert('Failed to generate tasks. Make sure the database function exists.')
-    } else {
-      fetchTasks()
-    }
-  }
-
-  const grouped = {
-    AM: tasks.filter((t) => t.shift === 'AM'),
-    'Mid-Day': tasks.filter((t) => t.shift === 'Mid-Day'),
-    PM: tasks.filter((t) => t.shift === 'PM'),
+  async function handleDeleteTask(taskId) {
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+    if (error) console.error('Error deleting task:', error)
   }
 
   function getAssigneeName(task) {
@@ -164,8 +159,26 @@ export default function TaskBoard() {
       const user = users.find((u) => u.id === task.assigned_to)
       return user?.display_name || 'Unknown'
     }
-    return 'Unassigned'
+    return null
   }
+
+  const now = new Date()
+  const filtered = tasks.filter((t) => {
+    if (filterTab === 'active') {
+      // Show active tasks + done tasks completed within last 24 hours
+      if (t.status !== 'Done') return true
+      if (t.completed_at) {
+        const completedAt = new Date(t.completed_at)
+        return (now - completedAt) < 24 * 60 * 60 * 1000
+      }
+      return false
+    }
+    if (filterTab === 'done') return t.status === 'Done'
+    return true
+  })
+
+  const activeCount = tasks.filter((t) => t.status !== 'Done').length
+  const doneCount = tasks.filter((t) => t.status === 'Done').length
 
   if (loading) {
     return (
@@ -182,95 +195,120 @@ export default function TaskBoard() {
         <div>
           <h1 className="text-xl font-bold text-amber-400">Task Board</h1>
           <p className="text-xs text-neutral-400">
-            {format(new Date(), 'EEEE, MMMM d')}
+            Overarching goals &amp; assignments
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={generateDailyTasks}
-            className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-500/30 transition"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Generate
-          </button>
-        )}
       </div>
 
-      {tasks.length === 0 ? (
+      {/* Stats bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+          <Target className="w-3.5 h-3.5 text-amber-500" />
+          <span><span className="text-amber-400 font-bold">{activeCount}</span> active</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+          <span><span className="text-green-400 font-bold">{doneCount}</span> done</span>
+        </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex items-center gap-2 mb-4">
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setFilterTab(tab.key)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+              filterTab === tab.key
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'bg-neutral-800 text-neutral-400 hover:text-neutral-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Task list */}
+      {filtered.length === 0 ? (
         <div className="text-center py-16 text-neutral-500">
-          <ClipboardListIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="font-medium">No tasks for today</p>
+          <ListChecks className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">
+            {filterTab === 'done' ? 'No completed tasks yet' : 'No active tasks'}
+          </p>
           <p className="text-xs mt-1">
             {isAdmin
-              ? 'Tap "Generate" to create tasks from templates.'
-              : 'Tasks will appear once generated by an admin.'}
+              ? 'Add tasks from Admin Settings → Board Tasks.'
+              : 'Tasks will appear when assigned by an admin.'}
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(grouped).map(([shift, shiftTasks]) => {
-            if (shiftTasks.length === 0) return null
-            const config = SHIFT_CONFIG[shift]
-            const ShiftIcon = config.icon
+        <div className="space-y-2">
+          {filtered.map((task) => {
+            const style = STATUS_STYLES[task.status]
+            const StatusIcon = style.icon
+            const isMyTask = task.assigned_to === profile?.id
+            const assignee = getAssigneeName(task)
+
             return (
-              <div key={shift}>
-                <div className="flex items-center gap-2 mb-2">
-                  <ShiftIcon className={`w-4 h-4 ${config.iconClass}`} />
-                  <h2 className="text-sm font-semibold text-neutral-300">
-                    {config.label} Shift
-                  </h2>
-                  <span className="text-[10px] bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded-full">
-                    {shiftTasks.filter((t) => t.status === 'Done').length}/
-                    {shiftTasks.length}
-                  </span>
+              <div
+                key={task.id}
+                onClick={() => handleTaskTap(task)}
+                className={`${style.bg} border ${style.border} rounded-xl p-3 flex items-center gap-3 transition-all active:scale-[0.98] cursor-pointer ${
+                  isMyTask ? 'ring-1 ring-amber-500/30' : ''
+                }`}
+              >
+                <StatusIcon className={`w-5 h-5 ${style.iconColor} shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`text-sm font-medium ${
+                      task.status === 'Done'
+                        ? 'text-neutral-500 line-through'
+                        : 'text-neutral-100'
+                    }`}
+                  >
+                    {task.title}
+                  </p>
+                  <p className="text-[10px] text-neutral-500 mt-0.5">
+                    {assignee || (
+                      <span className="text-neutral-600 italic">Unassigned</span>
+                    )}
+                    {isMyTask && (
+                      <span className="text-amber-500/70"> · You</span>
+                    )}
+                    {task.completed_at &&
+                      ` · Done ${format(new Date(task.completed_at), 'MMM d, h:mm a')}`}
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  {shiftTasks.map((task) => {
-                    const style = STATUS_STYLES[task.status]
-                    const StatusIcon = style.icon
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => handleTaskTap(task)}
-                        className={`${style.bg} border ${style.border} rounded-xl p-3 flex items-center gap-3 transition-all active:scale-[0.98] cursor-pointer`}
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${style.badge}`}
+                >
+                  {task.status}
+                </span>
+                {isAdmin && (
+                  <div className="flex items-center gap-0.5">
+                    {task.status !== 'Done' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingTask(task)
+                        }}
+                        className="p-1 rounded-lg hover:bg-neutral-700 transition"
                       >
-                        <StatusIcon className={`w-5 h-5 ${style.iconColor} shrink-0`} />
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm font-medium ${
-                              task.status === 'Done'
-                                ? 'text-neutral-500 line-through'
-                                : 'text-neutral-100'
-                            }`}
-                          >
-                            {task.title}
-                          </p>
-                          <p className="text-[10px] text-neutral-500 mt-0.5">
-                            {getAssigneeName(task)}
-                            {task.completed_at &&
-                              ` · Done at ${format(new Date(task.completed_at), 'h:mm a')}`}
-                          </p>
-                        </div>
-                        <span
-                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${style.badge}`}
-                        >
-                          {task.status}
-                        </span>
-                        {isAdmin && task.status !== 'Done' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingTask(task)
-                            }}
-                            className="p-1 rounded-lg hover:bg-neutral-700 transition"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-neutral-500" />
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                        <Pencil className="w-3.5 h-3.5 text-neutral-500" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (confirm('Delete this task?')) handleDeleteTask(task.id)
+                      }}
+                      className="p-1 rounded-lg hover:bg-neutral-700 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-neutral-500" />
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -288,7 +326,7 @@ export default function TaskBoard() {
               </button>
             </div>
             <p className="text-sm text-neutral-400 mb-3">
-              <span className="font-medium">{editingTask.title}</span> — {editingTask.shift} Shift
+              <span className="font-medium">{editingTask.title}</span>
             </p>
             <div className="space-y-1">
               <button
@@ -315,23 +353,5 @@ export default function TaskBoard() {
         </div>
       )}
     </div>
-  )
-}
-
-function ClipboardListIcon({ className }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-      />
-    </svg>
   )
 }

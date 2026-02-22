@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase, isConfigured } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -9,65 +9,24 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authReady, setAuthReady] = useState(false)
+  const fetchingRef = useRef(false)
 
+  // Effect 1: Track auth session ONLY. No database calls here.
   useEffect(() => {
     if (!isConfigured) {
       setLoading(false)
       return
     }
 
-    // This is the recommended, standard way to handle auth.
-    // It runs once on mount to get the initial state, then
-    // listens for any subsequent changes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log(`[Auth] onAuthStateChange event: ${event}`)
-        setSession(session)
-
-        if (session?.user) {
-          try {
-            const { data, error } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', session.user.id)
-              .single()
-
-            if (error && error.code === 'PGRST116') {
-              // No profile row exists yet — create one for this new user
-              console.log('[Auth] No profile found, creating one...')
-              const { data: newProfile, error: insertErr } = await supabase
-                .from('users')
-                .insert({ id: session.user.id, email: session.user.email })
-                .select()
-                .single()
-
-              if (insertErr) {
-                console.error('[Auth] Failed to create profile:', insertErr.message)
-                setProfile(null)
-              } else {
-                console.log('[Auth] New profile created')
-                setProfile(newProfile)
-              }
-            } else if (error) {
-              console.warn('[Auth] Profile fetch error:', error.message)
-              setProfile(null)
-            } else {
-              console.log('[Auth] Profile loaded:', data?.display_name)
-              setProfile(data)
-            }
-          } catch (err) {
-            console.error('[Auth] fetchProfile exception:', err)
-            setProfile(null)
-          }
-        } else {
-          setProfile(null)
-        }
-        // Loading is complete once the first auth event has been handled.
-        setLoading(false)
+      (event, currentSession) => {
+        console.log(`[Auth] event: ${event}`)
+        setSession(currentSession)
+        setAuthReady(true)
       }
     )
 
-    // Set up visibility change listener for better token refresh management.
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
         supabase.auth.startAutoRefresh()
@@ -82,6 +41,66 @@ export function AuthProvider({ children }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
+
+  // Effect 2: Fetch profile SEPARATELY, triggered by session changes.
+  // This avoids deadlocks from making Supabase calls inside onAuthStateChange.
+  useEffect(() => {
+    if (!authReady) return
+
+    if (!session?.user) {
+      setProfile(null)
+      setLoading(false)
+      return
+    }
+
+    if (fetchingRef.current) return
+    fetchingRef.current = true
+
+    const userId = session.user.id
+    const userEmail = session.user.email
+
+    async function loadProfile() {
+      console.log('[Auth] Fetching profile for:', userId)
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (error && error.code === 'PGRST116') {
+          console.log('[Auth] No profile found, creating one...')
+          const { data: newProfile, error: insertErr } = await supabase
+            .from('users')
+            .insert({ id: userId, email: userEmail })
+            .select()
+            .single()
+
+          if (insertErr) {
+            console.error('[Auth] Failed to create profile:', insertErr.message)
+            setProfile(null)
+          } else {
+            console.log('[Auth] New profile created')
+            setProfile(newProfile)
+          }
+        } else if (error) {
+          console.warn('[Auth] Profile fetch error:', error.message)
+          setProfile(null)
+        } else {
+          console.log('[Auth] Profile loaded:', data?.display_name)
+          setProfile(data)
+        }
+      } catch (err) {
+        console.error('[Auth] Profile fetch exception:', err)
+        setProfile(null)
+      } finally {
+        setLoading(false)
+        fetchingRef.current = false
+      }
+    }
+
+    loadProfile()
+  }, [authReady, session])
 
   async function updateDisplayName(displayName) {
     if (!session?.user) throw new Error('No session')

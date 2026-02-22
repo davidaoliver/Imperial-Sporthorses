@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { AlertTriangle, RefreshCw, X, Pencil, Save } from 'lucide-react'
+import { AlertTriangle, RefreshCw, X, Pencil, Save, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
 
 // Generate Main Barn stalls: 8 bottom, 4 top-left (Stalls 1-12)
 function generateMainBarnStalls() {
@@ -89,6 +89,100 @@ export default function FacilityMap() {
   const [editLabel, setEditLabel] = useState('')
   const [editLocationId, setEditLocationId] = useState('')
   const [hasChanges, setHasChanges] = useState(false)
+
+  // Zoom & pan state
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 1000, h: 700 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState(null)
+  const lastTouchDist = useRef(null)
+  const lastTouchCenter = useRef(null)
+  const mapContainerRef = useRef(null)
+
+  const MIN_ZOOM_W = 250 // max zoom in
+  const MAX_ZOOM_W = 1000 // max zoom out (original)
+
+  function resetZoom() {
+    setViewBox({ x: 0, y: 0, w: 1000, h: 700 })
+  }
+
+  function zoomBy(factor) {
+    setViewBox((v) => {
+      const newW = Math.min(MAX_ZOOM_W, Math.max(MIN_ZOOM_W, v.w * factor))
+      const newH = newW * 0.7
+      const cx = v.x + v.w / 2
+      const cy = v.y + v.h / 2
+      return {
+        x: Math.max(0, Math.min(1000 - newW, cx - newW / 2)),
+        y: Math.max(0, Math.min(700 - newH, cy - newH / 2)),
+        w: newW, h: newH,
+      }
+    })
+  }
+
+  function getTouchDist(t1, t2) {
+    return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+  }
+
+  function getTouchCenter(t1, t2) {
+    return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }
+  }
+
+  function handleTouchStart(e) {
+    if (editMode) return
+    if (e.touches.length === 2) {
+      e.preventDefault()
+      lastTouchDist.current = getTouchDist(e.touches[0], e.touches[1])
+      lastTouchCenter.current = getTouchCenter(e.touches[0], e.touches[1])
+    } else if (e.touches.length === 1 && viewBox.w < MAX_ZOOM_W) {
+      setIsPanning(true)
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY, vx: viewBox.x, vy: viewBox.y })
+    }
+  }
+
+  function handleTouchMove(e) {
+    if (editMode) return
+    if (e.touches.length === 2 && lastTouchDist.current) {
+      e.preventDefault()
+      const newDist = getTouchDist(e.touches[0], e.touches[1])
+      const scale = lastTouchDist.current / newDist
+      lastTouchDist.current = newDist
+      setViewBox((v) => {
+        const newW = Math.min(MAX_ZOOM_W, Math.max(MIN_ZOOM_W, v.w * scale))
+        const newH = newW * 0.7
+        const cx = v.x + v.w / 2
+        const cy = v.y + v.h / 2
+        return {
+          x: Math.max(0, Math.min(1000 - newW, cx - newW / 2)),
+          y: Math.max(0, Math.min(700 - newH, cy - newH / 2)),
+          w: newW, h: newH,
+        }
+      })
+    } else if (e.touches.length === 1 && isPanning && panStart) {
+      const container = mapContainerRef.current
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      const scaleX = viewBox.w / rect.width
+      const scaleY = viewBox.h / rect.height
+      const dx = (panStart.x - e.touches[0].clientX) * scaleX
+      const dy = (panStart.y - e.touches[0].clientY) * scaleY
+      setViewBox((v) => ({
+        ...v,
+        x: Math.max(0, Math.min(1000 - v.w, panStart.vx + dx)),
+        y: Math.max(0, Math.min(700 - v.h, panStart.vy + dy)),
+      }))
+    }
+  }
+
+  function handleTouchEnd(e) {
+    if (e.touches.length < 2) {
+      lastTouchDist.current = null
+      lastTouchCenter.current = null
+    }
+    if (e.touches.length === 0) {
+      setIsPanning(false)
+      setPanStart(null)
+    }
+  }
 
   const fetchData = useCallback(async () => {
     try {
@@ -304,10 +398,30 @@ export default function FacilityMap() {
       )}
 
       {/* SVG Map */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
+      <div
+        ref={mapContainerRef}
+        className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Zoom controls */}
+        <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+          <button onClick={() => zoomBy(0.6)} className="bg-neutral-800/90 border border-neutral-700 rounded-lg p-1.5 text-amber-400 hover:bg-neutral-700 transition">
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button onClick={() => zoomBy(1.5)} className="bg-neutral-800/90 border border-neutral-700 rounded-lg p-1.5 text-amber-400 hover:bg-neutral-700 transition">
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          {viewBox.w < MAX_ZOOM_W && (
+            <button onClick={resetZoom} className="bg-neutral-800/90 border border-neutral-700 rounded-lg p-1.5 text-amber-400 hover:bg-neutral-700 transition">
+              <Maximize className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         <svg
-          ref={svgRef} viewBox="0 0 1000 700" className="w-full"
-          style={{ touchAction: editMode ? 'none' : 'manipulation' }}
+          ref={svgRef} viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`} className="w-full"
+          style={{ touchAction: editMode ? 'none' : 'none' }}
           onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
         >
           <rect x="0" y="0" width="1000" height="700" fill="#0a0a0a" />

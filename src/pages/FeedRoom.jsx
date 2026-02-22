@@ -277,7 +277,7 @@ export default function FeedRoom() {
       {/* Add Inventory Modal */}
       {showInventoryModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center animate-fade-in">
-          <div className="bg-neutral-900 border-t border-neutral-700 rounded-t-2xl w-full max-w-lg p-5 pb-8 animate-slide-up">
+          <div className="bg-neutral-900 border-t border-neutral-700 rounded-t-2xl w-full max-w-lg p-5 pb-24 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-neutral-100">Add Inventory Item</h3>
               <button onClick={() => setShowInventoryModal(false)}>
@@ -332,7 +332,7 @@ export default function FeedRoom() {
       {/* Add Delivery Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center animate-fade-in">
-          <div className="bg-neutral-900 border-t border-neutral-700 rounded-t-2xl w-full max-w-lg p-5 pb-8 animate-slide-up">
+          <div className="bg-neutral-900 border-t border-neutral-700 rounded-t-2xl w-full max-w-lg p-5 pb-24 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-neutral-100">Add Delivery</h3>
               <button onClick={() => setShowAddModal(false)}>

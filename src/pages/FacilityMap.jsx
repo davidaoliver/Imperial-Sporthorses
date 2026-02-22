@@ -352,13 +352,13 @@ export default function FacilityMap() {
   const stallAreas = mapAreas.filter((a) => a.parent)
 
   return (
-    <div className="px-4 pt-4 pb-4">
+    <div className="px-2 pt-2 pb-2 flex flex-col" style={{ height: 'calc(100vh - 70px)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1 px-1">
         <div>
-          <h1 className="text-xl font-bold text-amber-400">Facility Map</h1>
-          <p className="text-xs text-neutral-400">
-            {editMode ? 'Drag to move · corner handles to resize · tap to edit' : 'Aerial view — tap areas to see horses'}
+          <h1 className="text-lg font-bold text-amber-400 leading-tight">Facility Map</h1>
+          <p className="text-[10px] text-neutral-400">
+            {editMode ? 'Drag · resize · tap to edit' : 'Tap areas · pinch to zoom'}
           </p>
         </div>
         {isAdmin && (
@@ -382,7 +382,7 @@ export default function FacilityMap() {
 
       {/* Legend */}
       {!editMode && (
-        <div className="flex gap-2 text-[9px] text-neutral-500 mb-3">
+        <div className="flex gap-2 text-[9px] text-neutral-500 mb-1 px-1">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-700 border border-green-500 inline-block" /> Pasture</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-900 border border-amber-500 inline-block" /> Barn</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-900 border border-indigo-500 inline-block" /> Arena</span>
@@ -400,7 +400,7 @@ export default function FacilityMap() {
       {/* SVG Map */}
       <div
         ref={mapContainerRef}
-        className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden relative"
+        className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden relative flex-1 min-h-0"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -420,8 +420,9 @@ export default function FacilityMap() {
           )}
         </div>
         <svg
-          ref={svgRef} viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`} className="w-full"
-          style={{ touchAction: editMode ? 'none' : 'none' }}
+          ref={svgRef} viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`} className="w-full h-full"
+          preserveAspectRatio="xMidYMid meet"
+          style={{ touchAction: 'none' }}
           onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
         >
           <rect x="0" y="0" width="1000" height="700" fill="#0a0a0a" />

@@ -102,15 +102,15 @@ export default function AdminSettings() {
     fetchAll()
   }
 
+  // All map locations that should always exist
+  const MAP_STALLS = Array.from({ length: 22 }, (_, i) => `Stall ${i + 1}`)
+  const MAP_PASTURES = ['Pasture #1', 'Pasture #2', 'Pasture #3', 'Pasture #4', 'Pasture #5']
+
   // Auto-create all stalls and pastures to match the facility map
   async function syncMapLocations() {
     const needed = [
-      ...Array.from({ length: 22 }, (_, i) => ({ name: `Stall ${i + 1}`, type: 'Stall' })),
-      { name: 'Pasture #1', type: 'Pasture' },
-      { name: 'Pasture #2', type: 'Pasture' },
-      { name: 'Pasture #3', type: 'Pasture' },
-      { name: 'Pasture #4', type: 'Pasture' },
-      { name: 'Pasture #5', type: 'Pasture' },
+      ...MAP_STALLS.map((name) => ({ name, type: 'Stall' })),
+      ...MAP_PASTURES.map((name) => ({ name, type: 'Pasture' })),
     ]
     const existing = locations.map((l) => l.name)
     const toCreate = needed.filter((n) => !existing.includes(n.name))
@@ -305,7 +305,7 @@ export default function AdminSettings() {
 
       {activeSection === 'locations' && (
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-neutral-300">Stalls & Pastures</h3>
             <button
               onClick={syncMapLocations}
@@ -314,105 +314,77 @@ export default function AdminSettings() {
               Sync with Map
             </button>
           </div>
-          <form onSubmit={addLocation} className="flex gap-2 mb-4">
-            <input
-              type="text"
-              value={newLocation.name}
-              onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-              placeholder="Name"
-              className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-            <select
-              value={newLocation.type}
-              onChange={(e) => setNewLocation({ ...newLocation, type: e.target.value })}
-              className="rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              <option value="Stall">Stall</option>
-              <option value="Pasture">Pasture</option>
-            </select>
-            <button type="submit" className="bg-amber-500 text-black px-3 py-2 rounded-lg">
-              <Plus className="w-4 h-4" />
-            </button>
-          </form>
 
-          {/* Stalls */}
-          <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide mb-2">Stalls</p>
-          <div className="space-y-1.5 mb-4">
-            {locations.filter(l => l.type === 'Stall').map((loc) => {
-              const horseHere = horses.find(h => h.current_location === loc.id)
-              return (
-                <div key={loc.id} className="flex items-center gap-2 py-1.5 border-b border-neutral-800 last:border-0">
-                  <span className="text-sm text-neutral-300 w-24 shrink-0 font-medium">{loc.name}</span>
-                  <select
-                    value={horseHere?.id || ''}
-                    onChange={async (e) => {
-                      if (horseHere) await supabase.from('horses').update({ current_location: null }).eq('id', horseHere.id)
-                      if (e.target.value) await supabase.from('horses').update({ current_location: loc.id }).eq('id', e.target.value)
-                      fetchAll()
-                    }}
-                    className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    <option value="">— Empty —</option>
-                    {horses.map(h => (
-                      <option key={h.id} value={h.id}>{h.name}{h.current_location && h.current_location !== loc.id ? ' (elsewhere)' : ''}</option>
-                    ))}
-                  </select>
-                  <button onClick={() => deleteLocation(loc.id)} className="p-1 text-neutral-500 hover:text-red-400 shrink-0">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )
-            })}
-            {locations.filter(l => l.type === 'Stall').length === 0 && (
-              <p className="text-xs text-neutral-500 py-2">No stalls yet. Add one above.</p>
-            )}
-          </div>
-
-          {/* Pastures */}
-          <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wide mb-2">Pastures</p>
-          <div className="space-y-2">
-            {locations.filter(l => l.type === 'Pasture').map((loc) => {
-              const horsesHere = horses.filter(h => h.current_location === loc.id)
-              return (
-                <div key={loc.id} className="bg-neutral-800/50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-neutral-200 font-medium">{loc.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-neutral-500">{horsesHere.length} horse{horsesHere.length !== 1 ? 's' : ''}</span>
-                      <button onClick={() => deleteLocation(loc.id)} className="p-1 text-neutral-500 hover:text-red-400">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  {horsesHere.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {horsesHere.map(h => (
-                        <span key={h.id} className="text-[10px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full font-medium">{h.name}</span>
+            {/* Stalls — always show all 22 */}
+            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide mb-2">Stalls (22)</p>
+            <div className="space-y-1.5 mb-5">
+              {MAP_STALLS.map((stallName) => {
+                const loc = locations.find(l => l.name === stallName)
+                const horseHere = loc ? horses.find(h => h.current_location === loc.id) : null
+                return (
+                  <div key={stallName} className="flex items-center gap-2 py-1.5 border-b border-neutral-800 last:border-0">
+                    <span className="text-sm text-neutral-300 w-20 shrink-0 font-medium">{stallName}</span>
+                    <select
+                      value={horseHere?.id || ''}
+                      disabled={!loc}
+                      onChange={async (e) => {
+                        if (!loc) return
+                        if (horseHere) await supabase.from('horses').update({ current_location: null }).eq('id', horseHere.id)
+                        if (e.target.value) await supabase.from('horses').update({ current_location: loc.id }).eq('id', e.target.value)
+                        fetchAll()
+                      }}
+                      className={`flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                        horseHere ? 'text-amber-300' : 'text-neutral-500'
+                      }`}
+                    >
+                      <option value="">— Empty —</option>
+                      {horses.map(h => (
+                        <option key={h.id} value={h.id}>{h.name}{h.current_location && h.current_location !== loc?.id ? ' (elsewhere)' : ''}</option>
                       ))}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Pastures — always show all 5 */}
+            <p className="text-[10px] font-semibold text-green-400 uppercase tracking-wide mb-2">Pastures (5)</p>
+            <div className="space-y-2">
+              {MAP_PASTURES.map((pastureName) => {
+                const loc = locations.find(l => l.name === pastureName)
+                const horsesHere = loc ? horses.filter(h => h.current_location === loc.id) : []
+                return (
+                  <div key={pastureName} className="bg-neutral-800/50 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-neutral-200 font-medium">{pastureName}</span>
+                      <span className="text-[10px] text-neutral-500">{horsesHere.length} horse{horsesHere.length !== 1 ? 's' : ''}</span>
                     </div>
-                  )}
-                  <select
-                    value=""
-                    onChange={async (e) => {
-                      if (e.target.value) {
+                    {horsesHere.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {horsesHere.map(h => (
+                          <span key={h.id} className="text-[10px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded-full font-medium">{h.name}</span>
+                        ))}
+                      </div>
+                    )}
+                    <select
+                      value=""
+                      disabled={!loc}
+                      onChange={async (e) => {
+                        if (!loc || !e.target.value) return
                         await supabase.from('horses').update({ current_location: loc.id }).eq('id', e.target.value)
                         fetchAll()
-                      }
-                    }}
-                    className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    <option value="">+ Add horse to pasture...</option>
-                    {horses.filter(h => h.current_location !== loc.id).map(h => (
-                      <option key={h.id} value={h.id}>{h.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )
-            })}
-            {locations.filter(l => l.type === 'Pasture').length === 0 && (
-              <p className="text-xs text-neutral-500 py-2">No pastures yet. Add one above.</p>
-            )}
-          </div>
+                      }}
+                      className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs text-neutral-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="">+ Add horse to pasture...</option>
+                      {horses.filter(h => h.current_location !== loc?.id).map(h => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
         </div>
       )}
 

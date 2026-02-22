@@ -11,6 +11,20 @@ if (!isConfigured) {
   )
 }
 
+// Custom storage adapter — bypasses the default which can trigger
+// the browser's LockManager API and cause 10s timeouts.
+const CustomStorage = {
+  getItem: (key) => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+  removeItem: (key) => localStorage.removeItem(key),
+}
+
+// Custom lock function — bypasses navigator.locks which times out
+// in some browser/PWA environments, causing the app to hang.
+const customLock = async (name, acquireTimeout, fn) => {
+  return await fn()
+}
+
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder',
@@ -20,6 +34,8 @@ export const supabase = createClient(
       detectSessionInUrl: true,
       autoRefreshToken: true,
       persistSession: true,
+      storage: CustomStorage,
+      lock: customLock,
     },
   }
 )

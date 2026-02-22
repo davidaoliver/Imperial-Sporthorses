@@ -99,7 +99,7 @@ export default function FacilityMap() {
   const mapContainerRef = useRef(null)
 
   const MIN_ZOOM_W = 250 // max zoom in
-  const MAX_ZOOM_W = 1000 // max zoom out (original)
+  const MAX_ZOOM_W = 1400 // max zoom out (wider than map to see everything)
 
   function resetZoom() {
     setViewBox({ x: 0, y: 0, w: 1000, h: 700 })
@@ -112,8 +112,8 @@ export default function FacilityMap() {
       const cx = v.x + v.w / 2
       const cy = v.y + v.h / 2
       return {
-        x: Math.max(-200, Math.min(1000 - newW + 200, cx - newW / 2)),
-        y: Math.max(-200, Math.min(700 - newH + 200, cy - newH / 2)),
+        x: Math.max(-300, Math.min(1000 - newW + 300, cx - newW / 2)),
+        y: Math.max(-300, Math.min(700 - newH + 300, cy - newH / 2)),
         w: newW, h: newH,
       }
     })
@@ -167,8 +167,8 @@ export default function FacilityMap() {
       const dy = (panStart.y - e.touches[0].clientY) * scaleY
       setViewBox((v) => ({
         ...v,
-        x: Math.max(-200, Math.min(1000 - v.w + 200, panStart.vx + dx)),
-        y: Math.max(-200, Math.min(700 - v.h + 200, panStart.vy + dy)),
+        x: Math.max(-300, Math.min(1000 - v.w + 300, panStart.vx + dx)),
+        y: Math.max(-300, Math.min(700 - v.h + 300, panStart.vy + dy)),
       }))
     }
   }
@@ -425,7 +425,7 @@ export default function FacilityMap() {
           style={{ touchAction: 'none' }}
           onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
         >
-          <rect x="0" y="0" width="1000" height="700" fill="#0a0a0a" />
+          <rect x="-300" y="-300" width="1600" height="1300" fill="#0a0a0a" />
 
           {[...parentAreas, ...stallAreas].map((area) => {
             const idx = mapAreas.findIndex((a) => a.id === area.id)

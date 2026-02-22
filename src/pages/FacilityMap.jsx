@@ -112,8 +112,8 @@ export default function FacilityMap() {
       const cx = v.x + v.w / 2
       const cy = v.y + v.h / 2
       return {
-        x: Math.max(0, Math.min(1000 - newW, cx - newW / 2)),
-        y: Math.max(0, Math.min(700 - newH, cy - newH / 2)),
+        x: Math.max(-200, Math.min(1000 - newW + 200, cx - newW / 2)),
+        y: Math.max(-200, Math.min(700 - newH + 200, cy - newH / 2)),
         w: newW, h: newH,
       }
     })
@@ -133,7 +133,7 @@ export default function FacilityMap() {
       e.preventDefault()
       lastTouchDist.current = getTouchDist(e.touches[0], e.touches[1])
       lastTouchCenter.current = getTouchCenter(e.touches[0], e.touches[1])
-    } else if (e.touches.length === 1 && viewBox.w < MAX_ZOOM_W) {
+    } else if (e.touches.length === 1) {
       setIsPanning(true)
       setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY, vx: viewBox.x, vy: viewBox.y })
     }
@@ -152,8 +152,8 @@ export default function FacilityMap() {
         const cx = v.x + v.w / 2
         const cy = v.y + v.h / 2
         return {
-          x: Math.max(0, Math.min(1000 - newW, cx - newW / 2)),
-          y: Math.max(0, Math.min(700 - newH, cy - newH / 2)),
+          x: Math.max(-200, Math.min(1000 - newW + 200, cx - newW / 2)),
+          y: Math.max(-200, Math.min(700 - newH + 200, cy - newH / 2)),
           w: newW, h: newH,
         }
       })
@@ -167,8 +167,8 @@ export default function FacilityMap() {
       const dy = (panStart.y - e.touches[0].clientY) * scaleY
       setViewBox((v) => ({
         ...v,
-        x: Math.max(0, Math.min(1000 - v.w, panStart.vx + dx)),
-        y: Math.max(0, Math.min(700 - v.h, panStart.vy + dy)),
+        x: Math.max(-200, Math.min(1000 - v.w + 200, panStart.vx + dx)),
+        y: Math.max(-200, Math.min(700 - v.h + 200, panStart.vy + dy)),
       }))
     }
   }

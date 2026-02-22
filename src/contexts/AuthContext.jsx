@@ -32,7 +32,23 @@ export function AuthProvider({ children }) {
               .eq('id', session.user.id)
               .single()
 
-            if (error) {
+            if (error && error.code === 'PGRST116') {
+              // No profile row exists yet — create one for this new user
+              console.log('[Auth] No profile found, creating one...')
+              const { data: newProfile, error: insertErr } = await supabase
+                .from('users')
+                .insert({ id: session.user.id, email: session.user.email })
+                .select()
+                .single()
+
+              if (insertErr) {
+                console.error('[Auth] Failed to create profile:', insertErr.message)
+                setProfile(null)
+              } else {
+                console.log('[Auth] New profile created')
+                setProfile(newProfile)
+              }
+            } else if (error) {
               console.warn('[Auth] Profile fetch error:', error.message)
               setProfile(null)
             } else {

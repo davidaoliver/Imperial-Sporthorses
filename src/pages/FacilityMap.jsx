@@ -314,7 +314,8 @@ export default function FacilityMap() {
   // Tap handling
   function handleAreaTap(area) {
     if (editMode) {
-      // In edit mode, just select for drag/resize — no popup
+      // In edit mode, select for resize handles only (no popup panel)
+      setSelectedArea(selectedArea?.id === area.id ? null : area)
       return
     }
     if (draggingHorse) {
@@ -511,33 +512,11 @@ export default function FacilityMap() {
         </svg>
       </div>
 
-      {/* Edit panel */}
+      {/* Edit panel - minimal info bar only */}
       {editMode && selectedArea && (
-        <div className="mt-3 bg-neutral-900 border border-amber-500/30 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-amber-400">Edit: {selectedArea.label}</h3>
-            <button onClick={() => setSelectedArea(null)} className="p-1"><X className="w-4 h-4 text-neutral-500" /></button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-[10px] text-neutral-500 uppercase font-semibold">Label</label>
-              <input type="text" value={editLabel} onChange={(e) => updateLabel(e.target.value)}
-                className="w-full mt-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-amber-500/50"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-neutral-500 uppercase font-semibold">Link to Location</label>
-              <select value={editLocationId} onChange={(e) => linkLocation(e.target.value)}
-                className="w-full mt-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-amber-500/50"
-              >
-                <option value="">— None —</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
-                ))}
-              </select>
-            </div>
-            <p className="text-[10px] text-neutral-600">Position: ({selectedArea.x}, {selectedArea.y}) · Size: {selectedArea.w}×{selectedArea.h}</p>
-          </div>
+        <div className="mt-1 bg-neutral-900 border border-amber-500/30 rounded-lg px-3 py-1.5 flex items-center justify-between">
+          <span className="text-xs text-amber-400 font-semibold">{selectedArea.label}</span>
+          <span className="text-[10px] text-neutral-500">{selectedArea.w}×{selectedArea.h}</span>
         </div>
       )}
 

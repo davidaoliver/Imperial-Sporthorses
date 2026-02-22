@@ -3,24 +3,22 @@ import { useAuth } from '../contexts/AuthContext'
 import { ArrowRight, RefreshCw } from 'lucide-react'
 
 export default function CompleteProfilePage() {
-  const { session, updateDisplayName, signOut, fetchProfile } = useAuth()
+  const { session, updateDisplayName, profile } = useAuth()
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [retrying, setRetrying] = useState(true)
 
-  // Try to re-fetch profile in case it failed to load initially (5s max)
+  // Give auth context a few seconds to finish loading profile
   useEffect(() => {
-    if (session?.user) {
-      const timer = setTimeout(() => setRetrying(false), 5000)
-      fetchProfile(session.user.id).finally(() => {
-        clearTimeout(timer)
-        setRetrying(false)
-      })
-    } else {
-      setRetrying(false)
-    }
-  }, [session])
+    const timer = setTimeout(() => setRetrying(false), 3000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // If profile loads with a display_name, stop retrying immediately
+  useEffect(() => {
+    if (profile?.display_name) setRetrying(false)
+  }, [profile])
 
   async function handleSubmit(e) {
     e.preventDefault()

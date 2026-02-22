@@ -77,6 +77,18 @@ export default function AdminSettings() {
     fetchAll()
   }, [fetchAll])
 
+  // Auto-sync map locations after data loads
+  useEffect(() => {
+    if (locations.length === 0) return
+    const needed = [
+      ...Array.from({ length: 22 }, (_, i) => `Stall ${i + 1}`),
+      'Pasture #1', 'Pasture #2', 'Pasture #3', 'Pasture #4', 'Pasture #5',
+    ]
+    const existing = locations.map((l) => l.name)
+    const missing = needed.filter((n) => !existing.includes(n))
+    if (missing.length > 0) syncMapLocations()
+  }, [locations.length])
+
   // --- Users ---
   async function toggleUserRole(user) {
     const newRole = user.role === 'Admin' ? 'Staff' : 'Admin'

@@ -48,19 +48,24 @@ export default function AdminSettings() {
   })
 
   const fetchAll = useCallback(async () => {
-    const [uRes, lRes, hRes, tRes, sRes] = await Promise.all([
-      supabase.from('users').select('*').order('display_name'),
-      supabase.from('locations').select('*').order('type').order('name'),
-      supabase.from('horses').select('*').order('name'),
-      supabase.from('task_templates').select('*').order('shift').order('sort_order'),
-      supabase.from('weekly_schedule').select('*, user:users!weekly_schedule_user_id_fkey(display_name)'),
-    ])
-    setUsers(uRes.data || [])
-    setLocations(lRes.data || [])
-    setHorses(hRes.data || [])
-    setTemplates(tRes.data || [])
-    setSchedule(sRes.data || [])
-    setLoading(false)
+    try {
+      const [uRes, lRes, hRes, tRes, sRes] = await Promise.all([
+        supabase.from('users').select('*').order('display_name'),
+        supabase.from('locations').select('*').order('type').order('name'),
+        supabase.from('horses').select('*').order('name'),
+        supabase.from('task_templates').select('*').order('shift').order('sort_order'),
+        supabase.from('weekly_schedule').select('*, user:users!weekly_schedule_user_id_fkey(display_name)'),
+      ])
+      setUsers(uRes.data || [])
+      setLocations(lRes.data || [])
+      setHorses(hRes.data || [])
+      setTemplates(tRes.data || [])
+      setSchedule(sRes.data || [])
+    } catch (err) {
+      console.error('fetchAll exception:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {

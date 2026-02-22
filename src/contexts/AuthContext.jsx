@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, isConfigured } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const initialized = useRef(false)
 
   useEffect(() => {
     if (!isConfigured) {
@@ -17,110 +16,60 @@ export function AuthProvider({ children }) {
       return
     }
 
-    // Safety timeout — never stay stuck loading for more than 10s
-    const timeout = setTimeout(() => {
-      console.warn('[Auth] Timeout reached — forcing loading=false')
-      setLoading(false)
-    }, 10000)
-
-    // Use onAuthStateChange as the single source of truth
+    // This is the recommended, standard way to handle auth.
+    // It runs once on mount to get the initial state, then
+    // listens for any subsequent changes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        console.log('[Auth] onAuthStateChange:', _event, session?.user?.email)
+      async (event, session) => {
+        console.log(`[Auth] onAuthStateChange event: ${event}`)
         setSession(session)
+
         if (session?.user) {
-          await fetchProfile(session.user.id)
+          try {
+            const { data, error } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+
+            if (error) {
+              console.warn('[Auth] Profile fetch error:', error.message)
+              setProfile(null)
+            } else {
+              console.log('[Auth] Profile loaded:', data?.display_name)
+              setProfile(data)
+            }
+          } catch (err) {
+            console.error('[Auth] fetchProfile exception:', err)
+            setProfile(null)
+          }
         } else {
           setProfile(null)
-          setLoading(false)
         }
-        clearTimeout(timeout)
+        // Loading is complete once the first auth event has been handled.
+        setLoading(false)
       }
     )
 
-    // Also do an initial getSession check for page refreshes
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[Auth] getSession:', session?.user?.email ?? 'no session')
-      if (!initialized.current) {
-        initialized.current = true
-        setSession(session)
-        if (session?.user) {
-          fetchProfile(session.user.id).then(() => clearTimeout(timeout))
-        } else {
-          setLoading(false)
-          clearTimeout(timeout)
-        }
+    // Set up visibility change listener for better token refresh management.
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.startAutoRefresh()
+      } else {
+        supabase.auth.stopAutoRefresh()
       }
-    }).catch((err) => {
-      console.error('[Auth] getSession error:', err)
-      setLoading(false)
-      clearTimeout(timeout)
-    })
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       subscription.unsubscribe()
-      clearTimeout(timeout)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
-  async function fetchProfile(userId, retryCount = 0) {
-    console.log('[Auth] fetchProfile for:', userId, 'attempt:', retryCount + 1)
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) {
-        console.warn('[Auth] Profile fetch error:', error.message, error.code)
-        // If user row doesn't exist, try to create it
-        if (error.code === 'PGRST116') {
-          const { data: sessionData } = await supabase.auth.getUser()
-          if (sessionData?.user) {
-            const { data: newProfile, error: insertErr } = await supabase
-              .from('users')
-              .upsert({
-                id: sessionData.user.id,
-                email: sessionData.user.email,
-              })
-              .select()
-              .single()
-            if (!insertErr && newProfile) {
-              console.log('[Auth] Created missing user row:', newProfile)
-              setProfile(newProfile)
-              return
-            }
-          }
-        }
-        // Retry once after 2s if first attempt failed
-        if (retryCount === 0) {
-          console.log('[Auth] Retrying fetchProfile in 2s...')
-          await new Promise(r => setTimeout(r, 2000))
-          return fetchProfile(userId, 1)
-        }
-        setProfile(null)
-      } else {
-        console.log('[Auth] Profile loaded:', data?.display_name, data?.role)
-        setProfile(data)
-      }
-    } catch (err) {
-      console.error('[Auth] fetchProfile exception:', err)
-      // Retry once after 2s if first attempt threw
-      if (retryCount === 0) {
-        console.log('[Auth] Retrying fetchProfile in 2s...')
-        await new Promise(r => setTimeout(r, 2000))
-        return fetchProfile(userId, 1)
-      }
-      setProfile(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function updateDisplayName(displayName) {
     if (!session?.user) throw new Error('No session')
-    console.log('[Auth] updateDisplayName:', displayName, 'for user:', session.user.id)
+
     const { data, error } = await supabase
       .from('users')
       .update({ display_name: displayName })
@@ -130,23 +79,9 @@ export function AuthProvider({ children }) {
 
     if (error) {
       console.error('[Auth] updateDisplayName error:', error)
-      // If update fails (row doesn't exist), try upsert
-      if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
-        const { data: upserted, error: upsertErr } = await supabase
-          .from('users')
-          .upsert({
-            id: session.user.id,
-            email: session.user.email,
-            display_name: displayName,
-          })
-          .select()
-          .single()
-        if (upsertErr) throw upsertErr
-        setProfile(upserted)
-        return upserted
-      }
       throw error
     }
+    // Update local profile state to instantly reflect the change
     setProfile(data)
     return data
   }
@@ -162,19 +97,9 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    try {
-      await supabase.auth.signOut()
-    } catch (err) {
-      console.warn('[Auth] signOut error (clearing state anyway):', err)
-    }
-    // Force clear everything
-    setSession(null)
-    setProfile(null)
-    try {
-      localStorage.clear()
-      sessionStorage.clear()
-    } catch (e) {}
-    window.location.reload()
+    await supabase.auth.signOut()
+    // The onAuthStateChange listener will handle clearing session/profile
+    window.location.reload() // Force a full reload to clear all state
   }
 
   const isAdmin = profile?.role === 'Admin'
@@ -187,7 +112,6 @@ export function AuthProvider({ children }) {
     signInWithGoogle,
     signOut,
     updateDisplayName,
-    fetchProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

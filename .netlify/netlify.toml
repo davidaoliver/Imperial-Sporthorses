@@ -7,10 +7,9 @@ headers = []
 [functions."*"]
 
 [build]
-publish = "C:\\Users\\david\\CascadeProjects\\windsurf-project\\barn-manager\\dist"
+publish = "C:\\Users\\david\\CascadeProjects\\Imperial-Sporthorses\\dist"
 publishOrigin = "config"
 commandOrigin = "config"
-base = "C:\\Users\\david\\CascadeProjects\\windsurf-project\\barn-manager"
 command = "npm run build"
 
 [build.environment]

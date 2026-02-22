@@ -176,13 +176,13 @@ export default function WeeklyPlanner() {
   }, [fetchWeekTasks])
 
   async function handleTaskTap(task) {
-    if (task.status === 'Done') return
-
     let updates
     if (task.status === 'Pending') {
       updates = { status: 'In Progress', assigned_to: profile.id }
     } else if (task.status === 'In Progress') {
       updates = { status: 'Done', completed_at: new Date().toISOString() }
+    } else if (task.status === 'Done') {
+      updates = { status: 'Pending', assigned_to: null, completed_at: null }
     }
 
     const { error } = await supabase

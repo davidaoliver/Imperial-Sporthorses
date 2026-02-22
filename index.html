@@ -18,17 +18,61 @@
     <link rel="apple-touch-icon" href="/logo.png" />
   </head>
   <body class="bg-neutral-950">
-    <div id="root"></div>
+    <!-- Fallback UI shown before React mounts -->
+    <div id="root">
+      <div id="preload" style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+        <img src="/logo.png" alt="Imperial Sporthorses" style="height:64px;opacity:0.8;" />
+        <div style="color:#fbbf24;font-size:14px;">Loading...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // Catch any JS errors and show recovery UI
+      window.onerror = function(msg, src, line) {
+        console.error('App error:', msg, src, line);
+        var root = document.getElementById('root');
+        if (root && (!root.children.length || root.querySelector('#preload'))) {
+          root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px;text-align:center;">' +
+            '<img src="/logo.png" style="height:64px;opacity:0.8;" />' +
+            '<div style="color:#fbbf24;font-size:16px;font-weight:bold;">Something went wrong</div>' +
+            '<div style="color:#a3a3a3;font-size:12px;max-width:280px;">Error: ' + msg + '</div>' +
+            '<button onclick="clearAndReload()" style="background:#f59e0b;color:#000;border:none;padding:10px 24px;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">Clear Cache & Reload</button>' +
+            '</div>';
+        }
+      };
+      function clearAndReload() {
+        // Clear all storage and caches
+        try { localStorage.clear(); } catch(e) {}
+        try { sessionStorage.clear(); } catch(e) {}
+        if ('caches' in window) {
+          caches.keys().then(function(keys) {
+            keys.forEach(function(k) { caches.delete(k); });
+          });
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        }
+        setTimeout(function() { window.location.href = window.location.origin; }, 500);
+      }
+      // Service worker
       if ('serviceWorker' in navigator) {
-        // Force update: unregister old SW, register new one
         navigator.serviceWorker.getRegistrations().then(regs => {
           regs.forEach(reg => reg.unregister())
         }).then(() => {
           navigator.serviceWorker.register('/sw.js')
         })
       }
+      // If React hasn't mounted after 10 seconds, show recovery
+      setTimeout(function() {
+        var pre = document.getElementById('preload');
+        if (pre) {
+          pre.innerHTML = '<img src="/logo.png" style="height:64px;opacity:0.8;" />' +
+            '<div style="color:#fbbf24;font-size:14px;">Taking longer than expected...</div>' +
+            '<button onclick="clearAndReload()" style="background:#f59e0b;color:#000;border:none;padding:10px 24px;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;margin-top:8px;">Clear Cache & Reload</button>';
+        }
+      }, 10000);
     </script>
   </body>
 </html>

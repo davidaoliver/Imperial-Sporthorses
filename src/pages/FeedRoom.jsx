@@ -6,6 +6,7 @@ import {
   Package,
   Plus,
   RefreshCw,
+  Trash2,
   X,
 } from 'lucide-react'
 import { format, differenceInDays, parseISO } from 'date-fns'
@@ -102,7 +103,7 @@ export default function FeedRoom() {
           <h1 className="text-xl font-bold text-amber-400">Feed Room</h1>
           <p className="text-xs text-neutral-400">Nutrition & inventory management</p>
         </div>
-        {isAdmin && activeSection === 'inventory' && (
+        {activeSection === 'inventory' && (
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-500/30 transition"
@@ -212,11 +213,7 @@ export default function FeedRoom() {
             <div className="text-center py-16 text-neutral-500">
               <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="font-medium">No inventory recorded</p>
-              <p className="text-xs mt-1">
-                {isAdmin
-                  ? 'Tap "Add Delivery" to add feed inventory.'
-                  : 'Inventory will appear once added by an admin.'}
-              </p>
+              <p className="text-xs mt-1">Tap "Add Delivery" to add feed inventory.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -248,6 +245,16 @@ export default function FeedRoom() {
                         {expStyle.label}
                       </span>
                     )}
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Delete ${item.feed_name}?`)) return
+                        await supabase.from('feed_inventory').delete().eq('id', item.id)
+                        fetchData()
+                      }}
+                      className="p-1.5 text-neutral-600 hover:text-red-400 transition shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )
               })}

@@ -59,6 +59,7 @@ const DEFAULT_AREAS = [
   { id: 'main-barn', label: 'Main Barn', type: 'barn', x: 200, y: 340, w: 250, h: 170 },
   ...generateMainBarnStalls(),
   { id: 'pasture-5', label: 'Pasture #5', type: 'pasture', x: 200, y: 520, w: 250, h: 90, dbName: 'Pasture #5' },
+  { id: 'feed-room', label: 'Feed Room', type: 'building', x: 460, y: 340, w: 80, h: 50 },
   { id: 'parking', label: 'Parking', type: 'road', x: 460, y: 400, w: 80, h: 260 },
   { id: 'entrance', label: 'Entrance', type: 'road', x: 550, y: 610, w: 120, h: 40 },
 ]

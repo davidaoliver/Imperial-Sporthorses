@@ -453,8 +453,8 @@ export default function FacilityMap() {
                 />
                 {/* Label */}
                 <text
-                  x={area.x + area.w / 2} y={isStall ? area.y + area.h / 2 + 3 : area.y + 16}
-                  textAnchor="middle" fontSize={isStall ? 8 : 11} fontWeight="700"
+                  x={area.x + area.w / 2} y={isStall ? area.y + area.h * 0.4 : area.y + Math.min(16, area.h * 0.15)}
+                  textAnchor="middle" fontSize={isStall ? Math.min(8, area.w * 0.25) : Math.min(11, area.w * 0.06)} fontWeight="700"
                   fill={isSelected ? '#fbbf24' : style.textColor} opacity={0.9}
                 >
                   {area.label}
@@ -462,19 +462,24 @@ export default function FacilityMap() {
                 {/* Horse count badge (non-stall, non-pasture) */}
                 {!editMode && !isStall && !isPasture && areaHorses.length > 0 && !isSelected && (
                   <>
-                    <circle cx={area.x + area.w - 14} cy={area.y + 14} r={9} fill="#f59e0b" />
-                    <text x={area.x + area.w - 14} y={area.y + 18} textAnchor="middle" fontSize="10" fontWeight="800" fill="#000">{areaHorses.length}</text>
+                    <circle cx={area.x + area.w - Math.min(14, area.w * 0.1)} cy={area.y + Math.min(14, area.h * 0.12)} r={Math.min(9, area.w * 0.05)} fill="#f59e0b" />
+                    <text x={area.x + area.w - Math.min(14, area.w * 0.1)} y={area.y + Math.min(18, area.h * 0.16)} textAnchor="middle" fontSize={Math.min(10, area.w * 0.05)} fontWeight="800" fill="#000">{areaHorses.length}</text>
                   </>
                 )}
                 {/* Pasture: always show horse names */}
-                {!editMode && isPasture && areaHorses.map((h, i) => (
-                  <text key={h.id} x={area.x + area.w / 2} y={area.y + 30 + i * 14}
-                    textAnchor="middle" fontSize="9" fontWeight="600" fill="#e5e5e5"
-                  >{h.name}</text>
-                ))}
+                {!editMode && isPasture && areaHorses.map((h, i) => {
+                  const nameStartY = area.y + area.h * 0.3
+                  const nameSpacing = Math.min(14, (area.h * 0.6) / Math.max(1, areaHorses.length))
+                  const nameFontSize = Math.min(9, area.w * 0.06, area.h * 0.08)
+                  return (
+                    <text key={h.id} x={area.x + area.w / 2} y={nameStartY + i * nameSpacing}
+                      textAnchor="middle" fontSize={nameFontSize} fontWeight="600" fill="#e5e5e5"
+                    >{h.name}</text>
+                  )
+                })}
                 {/* Stall: show horse name if occupied */}
                 {!editMode && isStall && areaHorses.length > 0 && (
-                  <text x={area.x + area.w / 2} y={area.y + area.h / 2 + 13} textAnchor="middle" fontSize="7" fontWeight="600" fill="#e5e5e5">
+                  <text x={area.x + area.w / 2} y={area.y + area.h * 0.75} textAnchor="middle" fontSize={Math.min(7, area.w * 0.2, area.h * 0.2)} fontWeight="600" fill="#e5e5e5">
                     {areaHorses[0].name}
                   </text>
                 )}
@@ -483,17 +488,22 @@ export default function FacilityMap() {
                   <rect x={area.x} y={area.y} width={area.w} height={area.h} rx={3} fill="#f59e0b" opacity={0.12} />
                 )}
                 {/* Horse names when selected (non-stall) */}
-                {!editMode && isSelected && !isStall && areaHorses.map((h, i) => (
-                  <g key={h.id} onClick={(e) => handleHorseTap(e, h)}>
-                    <rect x={area.x + 8} y={area.y + 26 + i * 22} width={area.w - 16} height={18} rx={4}
-                      fill={draggingHorse?.id === h.id ? '#f59e0b40' : '#ffffff15'}
-                      stroke={draggingHorse?.id === h.id ? '#f59e0b' : 'transparent'} strokeWidth={1}
-                    />
-                    <text x={area.x + 16} y={area.y + 39 + i * 22} fontSize="10" fontWeight="600"
-                      fill={draggingHorse?.id === h.id ? '#fbbf24' : '#e5e5e5'}
-                    >{h.name}</text>
-                  </g>
-                ))}
+                {!editMode && isSelected && !isStall && areaHorses.map((h, i) => {
+                  const rowH = Math.min(18, (area.h * 0.6) / Math.max(1, areaHorses.length))
+                  const startY = area.y + area.h * 0.25
+                  const pad = Math.min(8, area.w * 0.05)
+                  return (
+                    <g key={h.id} onClick={(e) => handleHorseTap(e, h)}>
+                      <rect x={area.x + pad} y={startY + i * (rowH + 4)} width={area.w - pad * 2} height={rowH} rx={4}
+                        fill={draggingHorse?.id === h.id ? '#f59e0b40' : '#ffffff15'}
+                        stroke={draggingHorse?.id === h.id ? '#f59e0b' : 'transparent'} strokeWidth={1}
+                      />
+                      <text x={area.x + pad + 8} y={startY + i * (rowH + 4) + rowH * 0.7} fontSize={Math.min(10, rowH * 0.7)} fontWeight="600"
+                        fill={draggingHorse?.id === h.id ? '#fbbf24' : '#e5e5e5'}
+                      >{h.name}</text>
+                    </g>
+                  )
+                })}
                 {/* Resize handles in edit mode */}
                 {editMode && isSelected && ['nw', 'ne', 'sw', 'se'].map((h) => {
                   const hx = h.includes('e') ? area.x + area.w : area.x

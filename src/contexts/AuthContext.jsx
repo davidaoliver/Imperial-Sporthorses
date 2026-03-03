@@ -33,23 +33,56 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         console.log(`[Auth] event: ${event}`)
+        // Ignore SIGNED_OUT from failed token refreshes (network blips)
+        // Only clear session if there's truly no session left
+        if (event === 'SIGNED_OUT' && !currentSession) {
+          // Check localStorage — if a refresh token still exists, try to recover
+          const stored = localStorage.getItem('sb-' + import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token')
+          if (stored) {
+            console.log('[Auth] SIGNED_OUT but stored token exists — attempting recovery')
+            supabase.auth.getSession().then(({ data }) => {
+              if (data?.session) {
+                setSession(data.session)
+              } else {
+                setSession(null)
+              }
+            })
+            setAuthReady(true)
+            return
+          }
+        }
         setSession(currentSession)
         setAuthReady(true)
       }
     )
 
+    // On visibility change, force a session refresh so the token stays fresh
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
         supabase.auth.startAutoRefresh()
+        // Explicitly refresh session when app comes back to foreground
+        supabase.auth.getSession().then(({ data, error }) => {
+          if (data?.session) setSession(data.session)
+          if (error) console.warn('[Auth] Visibility refresh error:', error.message)
+        })
       } else {
         supabase.auth.stopAutoRefresh()
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
+    // Periodic session refresh every 10 minutes to prevent expiry
+    const refreshInterval = setInterval(() => {
+      supabase.auth.getSession().then(({ data, error }) => {
+        if (data?.session) setSession(data.session)
+        if (error) console.warn('[Auth] Periodic refresh error:', error.message)
+      })
+    }, 10 * 60 * 1000)
+
     return () => {
       subscription.unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearInterval(refreshInterval)
     }
   }, [])
 

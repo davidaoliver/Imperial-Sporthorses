@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Send, RefreshCw, MessageSquare, AlertTriangle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
+import { subscribeToPush, sendPushAlert } from '../lib/pushSubscription'
 
 export default function Chat() {
   const { profile, isAdmin } = useAuth()
@@ -40,12 +41,12 @@ export default function Chat() {
     }
   }, [])
 
-  // Request notification permission on mount
+  // Subscribe to push notifications on mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    if (profile?.id) {
+      subscribeToPush(profile.id)
     }
-  }, [])
+  }, [profile?.id])
 
   // Send notification via service worker (works even when tab is backgrounded)
   function sendNotification(title, body, tag) {
@@ -116,6 +117,11 @@ export default function Chat() {
       console.error('Error sending message:', error)
       alert('Failed to send: ' + error.message)
       setNewMessage(trimmed)
+    } else if (isAlert) {
+      // Send real push notification to all devices via Netlify Function
+      sendPushAlert('🚨 Barn Alert', trimmed).catch((err) =>
+        console.error('Push send error:', err)
+      )
     }
     setSending(false)
     inputRef.current?.focus()

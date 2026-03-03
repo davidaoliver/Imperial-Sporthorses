@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imperial-v6'
+const CACHE_NAME = 'imperial-v7'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -17,6 +17,28 @@ self.addEventListener('message', (event) => {
       vibrate: [200, 100, 200, 100, 200],
     })
   }
+})
+
+// Handle Web Push events (works even when app is fully closed)
+self.addEventListener('push', (event) => {
+  if (!event.data) return
+  let data
+  try {
+    data = event.data.json()
+  } catch (e) {
+    data = { title: 'Imperial Sporthorses', body: event.data.text() }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || '🚨 Barn Alert', {
+      body: data.body || '',
+      icon: data.icon || '/notif-icon.png',
+      badge: data.badge || '/notif-badge.png',
+      tag: data.tag || 'barn-alert',
+      requireInteraction: true,
+      vibrate: [200, 100, 200, 100, 200],
+      data: data.data || { url: '/' },
+    })
+  )
 })
 
 // Handle notification click — focus or open the app

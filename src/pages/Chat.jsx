@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Send, RefreshCw, MessageSquare } from 'lucide-react'
+import { Send, RefreshCw, MessageSquare, AlertTriangle } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 
 export default function Chat() {
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -40,6 +40,13 @@ export default function Chat() {
     }
   }, [])
 
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
   useEffect(() => {
     fetchMessages()
 
@@ -48,7 +55,20 @@ export default function Chat() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
-        () => fetchMessages()
+        (payload) => {
+          fetchMessages()
+          // Browser push notification for alert messages
+          if (payload.new?.is_alert && payload.new?.user_id !== profile?.id) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('🚨 Barn Alert', {
+                body: payload.new.content,
+                icon: '/favicon.ico',
+                tag: 'barn-alert-' + payload.new.id,
+                requireInteraction: true,
+              })
+            }
+          }
+        }
       )
       .subscribe()
 
@@ -63,10 +83,12 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  async function handleSend(e) {
+  async function handleSend(e, isAlert = false) {
     e.preventDefault()
     const trimmed = newMessage.trim()
     if (!trimmed || !profile) return
+
+    if (isAlert && !confirm('Send this as an ALERT to everyone?')) return
 
     setSending(true)
     setNewMessage('')
@@ -74,6 +96,7 @@ export default function Chat() {
     const { error } = await supabase.from('messages').insert({
       user_id: profile.id,
       content: trimmed,
+      is_alert: isAlert,
     })
 
     if (error) {
@@ -124,6 +147,20 @@ export default function Chat() {
           <div className="space-y-3">
             {messages.map((msg) => {
               const isOwn = msg.user_id === profile?.id
+              if (msg.is_alert) {
+                return (
+                  <div key={msg.id} className="flex justify-center">
+                    <div className="w-full bg-red-900/40 border border-red-700/60 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                        <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">Alert</span>
+                        <span className="text-[10px] text-red-400/60 ml-auto">{getSenderName(msg)} · {formatTimestamp(msg.created_at)}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-red-100 leading-relaxed break-words">{msg.content}</p>
+                    </div>
+                  </div>
+                )
+              }
               return (
                 <div
                   key={msg.id}
@@ -169,6 +206,17 @@ export default function Chat() {
             placeholder="Type a message..."
             className="flex-1 rounded-xl border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           />
+          {isAdmin && (
+            <button
+              type="button"
+              disabled={!newMessage.trim() || sending}
+              onClick={(e) => handleSend(e, true)}
+              className="bg-red-600 text-white p-2.5 rounded-xl hover:bg-red-500 active:bg-red-700 transition disabled:opacity-40"
+              title="Send as Alert"
+            >
+              <AlertTriangle className="w-4 h-4" />
+            </button>
+          )}
           <button
             type="submit"
             disabled={!newMessage.trim() || sending}

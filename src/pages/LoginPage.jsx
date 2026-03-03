@@ -7,7 +7,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-950 px-6">
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
         <div className="flex justify-center mb-6">
-          <img src="/logo.png" alt="Imperial Sporthorses" className="h-28 w-auto" />
+          <img src="/logo.png" alt="Imperial Sporthorses" className="h-28 w-28 object-contain" />
         </div>
         <h1 className="text-2xl font-bold text-amber-400 mb-1">Imperial Sporthorses</h1>
         <p className="text-neutral-400 text-sm mb-8">

@@ -10,7 +10,7 @@ function SetupScreen() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-950 px-6">
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl p-8 w-full max-w-md animate-scale-in">
         <div className="flex justify-center mb-6">
-          <img src="/logo.png" alt="Imperial Sporthorses" className="h-20 w-auto" />
+          <img src="/logo.png" alt="Imperial Sporthorses" className="h-20 w-20 object-contain" />
         </div>
         <h1 className="text-2xl font-bold text-amber-400 mb-1 text-center">
           Imperial Sporthorses
@@ -86,7 +86,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-950">
         <div className="text-center animate-fade-in">
-          <img src="/logo.png" alt="Imperial Sporthorses" className="h-16 w-auto mx-auto mb-4 opacity-80" />
+          <img src="/logo.png" alt="Imperial Sporthorses" className="h-16 w-16 object-contain mx-auto mb-4 opacity-80" />
           <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mx-auto mb-3" />
           <p className="text-sm text-neutral-400">Loading...</p>
         </div>

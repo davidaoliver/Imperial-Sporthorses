@@ -21,7 +21,7 @@
     <!-- Fallback UI shown before React mounts -->
     <div id="root">
       <div id="preload" style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
-        <img src="/logo.png" alt="Imperial Sporthorses" style="height:64px;opacity:0.8;" />
+        <img src="/logo.png" alt="Imperial Sporthorses" style="height:80px;width:80px;object-fit:contain;opacity:0.8;" />
         <div style="color:#fbbf24;font-size:14px;">Loading...</div>
       </div>
     </div>
@@ -33,7 +33,7 @@
         var root = document.getElementById('root');
         if (root && (!root.children.length || root.querySelector('#preload'))) {
           root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px;text-align:center;">' +
-            '<img src="/logo.png" style="height:64px;opacity:0.8;" />' +
+            '<img src="/logo.png" style="height:80px;width:80px;object-fit:contain;opacity:0.8;" />' +
             '<div style="color:#fbbf24;font-size:16px;font-weight:bold;">Something went wrong</div>' +
             '<div style="color:#a3a3a3;font-size:12px;max-width:280px;">Error: ' + msg + '</div>' +
             '<button onclick="clearAndReload()" style="background:#f59e0b;color:#000;border:none;padding:10px 24px;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">Clear Cache & Reload</button>' +
@@ -68,7 +68,7 @@
       setTimeout(function() {
         var pre = document.getElementById('preload');
         if (pre) {
-          pre.innerHTML = '<img src="/logo.png" style="height:64px;opacity:0.8;" />' +
+          pre.innerHTML = '<img src="/logo.png" style="height:80px;width:80px;object-fit:contain;opacity:0.8;" />' +
             '<div style="color:#fbbf24;font-size:14px;">Taking longer than expected...</div>' +
             '<button onclick="clearAndReload()" style="background:#f59e0b;color:#000;border:none;padding:10px 24px;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;margin-top:8px;">Clear Cache & Reload</button>';
         }

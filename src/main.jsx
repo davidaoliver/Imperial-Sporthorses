@@ -19,7 +19,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 24, textAlign: 'center', background: '#0a0a0a' }}>
-          <img src="/logo.png" alt="Imperial Sporthorses" style={{ height: 64, opacity: 0.8 }} />
+          <img src="/logo.png" alt="Imperial Sporthorses" style={{ height: 80, width: 80, objectFit: 'contain', opacity: 0.8 }} />
           <div style={{ color: '#fbbf24', fontSize: 16, fontWeight: 'bold' }}>Something went wrong</div>
           <div style={{ color: '#a3a3a3', fontSize: 12, maxWidth: 280 }}>{this.state.error?.message || 'Unknown error'}</div>
           <button

@@ -62,7 +62,7 @@ export default function CompleteProfilePage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-950 px-6">
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         <div className="flex justify-center mb-6">
-          <img src="/logo.png" alt="Imperial Sporthorses" className="h-20 w-auto" />
+          <img src="/logo.png" alt="Imperial Sporthorses" className="h-20 w-20 object-contain" />
         </div>
         <h1 className="text-xl font-bold text-amber-400 mb-1 text-center">
           Complete Your Profile

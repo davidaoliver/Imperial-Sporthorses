@@ -175,6 +175,61 @@ export default function WeeklyPlanner() {
     return () => supabase.removeChannel(channel)
   }, [fetchWeekTasks])
 
+  // Auto-generate real tasks from templates for a given date
+  async function generateTasksForDate(dateStr) {
+    if (templates.length === 0) return false
+    // Check if tasks already exist for this date
+    const { data: existing } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('task_date', dateStr)
+      .not('shift', 'is', null)
+      .limit(1)
+    if (existing && existing.length > 0) return false
+
+    // Look up scheduled staff for this day
+    const date = new Date(dateStr + 'T12:00:00')
+    const dayOfWeek = date.getDay()
+    const staffByShift = {}
+    for (const entry of schedule) {
+      if (entry.day_of_week === dayOfWeek) {
+        if (!staffByShift[entry.shift]) staffByShift[entry.shift] = []
+        staffByShift[entry.shift].push(entry.user_id)
+      }
+    }
+
+    const rows = templates.map((t) => ({
+      title: t.title,
+      shift: t.shift,
+      sort_order: t.sort_order,
+      status: 'Pending',
+      task_date: dateStr,
+      assigned_to: staffByShift[t.shift]?.[0] || null,
+    }))
+
+    const { error } = await supabase.from('tasks').insert(rows)
+    if (error) {
+      console.error('Error generating tasks:', error)
+      return false
+    }
+    return true
+  }
+
+  // Auto-generate today's tasks if past 3 AM and none exist
+  useEffect(() => {
+    if (loading || templates.length === 0) return
+    const now = new Date()
+    if (now.getHours() < 3) return // not yet 3 AM
+    const todayStr = format(now, 'yyyy-MM-dd')
+    const todayTasks = weekTasks[todayStr] || []
+    const hasShiftTasks = todayTasks.some(t => t.shift !== null)
+    if (hasShiftTasks) return // already generated
+
+    generateTasksForDate(todayStr).then((created) => {
+      if (created) fetchWeekTasks()
+    })
+  }, [loading, templates.length, weekTasks, schedule])
+
   async function handleTaskTap(task) {
     let updates
     if (task.status === 'Pending') {
@@ -240,10 +295,9 @@ export default function WeeklyPlanner() {
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
   const realTasks = weekTasks[selectedDateStr] || []
-  const hasRealTasks = realTasks.length > 0
+  const hasRealTasks = realTasks.some(t => t.shift !== null)
 
-  // For days with no generated tasks, show templates as previews
-  // Pre-compute scheduled staff per shift for the selected day
+  // For future days that haven't been generated yet, show template previews
   const scheduledByShift = {}
   if (!hasRealTasks) {
     const dayOfWeek = selectedDate.getDay()
@@ -275,7 +329,6 @@ export default function WeeklyPlanner() {
   if (filter === 'mine') {
     selectedDayTasks = selectedDayTasks.filter((t) => {
       if (t._isPreview) {
-        // Only show preview tasks for shifts where I'm scheduled
         return t._scheduledNames?.includes(profile?.display_name)
       }
       return t.assigned_to === profile?.id
@@ -452,12 +505,12 @@ export default function WeeklyPlanner() {
         </h2>
       </div>
 
-      {/* Preview badge for days without generated tasks */}
+      {/* Future day preview hint */}
       {!hasRealTasks && selectedDayTasks.length > 0 && !loading && (
         <div className="flex items-center gap-2 mb-3 px-1">
           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
           <span className="text-[10px] text-blue-400 font-medium">
-            Preview from templates — tasks not yet generated
+            Upcoming — tasks will be generated at 3:00 AM
           </span>
         </div>
       )}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imperial-v5'
+const CACHE_NAME = 'imperial-v6'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -11,7 +11,7 @@ self.addEventListener('message', (event) => {
     self.registration.showNotification(title, {
       body,
       icon: '/notif-icon.png',
-      badge: '/notif-icon.png',
+      badge: '/notif-badge.png',
       tag: tag || 'barn-alert',
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200],

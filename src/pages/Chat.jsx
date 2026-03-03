@@ -59,7 +59,7 @@ export default function Chat() {
         })
       } else {
         // Fallback to basic Notification API
-        new Notification(title, { body, icon: '/icon-192.png', tag })
+        new Notification(title, { body, icon: '/notif-icon.png', tag })
       }
     }
   }

@@ -10,8 +10,8 @@ self.addEventListener('message', (event) => {
     const { title, body, tag } = event.data
     self.registration.showNotification(title, {
       body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: '/notif-icon.png',
+      badge: '/notif-icon.png',
       tag: tag || 'barn-alert',
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200],

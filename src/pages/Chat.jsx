@@ -93,14 +93,14 @@ export default function Chat() {
     setSending(true)
     setNewMessage('')
 
-    const { error } = await supabase.from('messages').insert({
-      user_id: profile.id,
-      content: trimmed,
-      is_alert: isAlert,
-    })
+    const row = { user_id: profile.id, content: trimmed }
+    if (isAlert) row.is_alert = true
+
+    const { error } = await supabase.from('messages').insert(row)
 
     if (error) {
       console.error('Error sending message:', error)
+      alert('Failed to send: ' + error.message)
       setNewMessage(trimmed)
     }
     setSending(false)

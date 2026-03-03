@@ -15,8 +15,8 @@ foreach ($size in @(512, 192)) {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
     $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 
-    # Fit image inside the square, centered
-    $ratio = [Math]::Min($size / $src.Width, $size / $src.Height)
+    # Fit image inside the square, centered — scale up 20% to fill the icon better
+    $ratio = [Math]::Min($size / $src.Width, $size / $src.Height) * 1.2
     $newW = [int]($src.Width * $ratio)
     $newH = [int]($src.Height * $ratio)
     $x = [int](($size - $newW) / 2)

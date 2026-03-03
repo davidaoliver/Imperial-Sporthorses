@@ -1,7 +1,35 @@
-const CACHE_NAME = 'imperial-v4'
+const CACHE_NAME = 'imperial-v5'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
+})
+
+// Handle notification messages from the main thread
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body, tag } = event.data
+    self.registration.showNotification(title, {
+      body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: tag || 'barn-alert',
+      requireInteraction: true,
+      vibrate: [200, 100, 200, 100, 200],
+    })
+  }
+})
+
+// Handle notification click — focus or open the app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then((clients) => {
+      if (clients.length > 0) {
+        return clients[0].focus()
+      }
+      return self.clients.openWindow('/')
+    })
+  )
 })
 
 self.addEventListener('activate', (event) => {

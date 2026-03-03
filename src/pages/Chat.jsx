@@ -47,6 +47,23 @@ export default function Chat() {
     }
   }, [])
 
+  // Send notification via service worker (works even when tab is backgrounded)
+  function sendNotification(title, body, tag) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title,
+          body,
+          tag,
+        })
+      } else {
+        // Fallback to basic Notification API
+        new Notification(title, { body, icon: '/icon-192.png', tag })
+      }
+    }
+  }
+
   useEffect(() => {
     fetchMessages()
 
@@ -57,16 +74,13 @@ export default function Chat() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           fetchMessages()
-          // Browser push notification for alert messages
+          // Push notification for alert messages
           if (payload.new?.is_alert && payload.new?.user_id !== profile?.id) {
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('🚨 Barn Alert', {
-                body: payload.new.content,
-                icon: '/favicon.ico',
-                tag: 'barn-alert-' + payload.new.id,
-                requireInteraction: true,
-              })
-            }
+            sendNotification(
+              '🚨 Barn Alert',
+              payload.new.content,
+              'barn-alert-' + payload.new.id
+            )
           }
         }
       )
@@ -130,9 +144,19 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 pt-4 pb-2">
-        <h1 className="text-xl font-bold text-amber-400">Barn Chat</h1>
-        <p className="text-xs text-neutral-400">Team group chat</p>
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-amber-400">Barn Chat</h1>
+          <p className="text-xs text-neutral-400">Team group chat</p>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => sendNotification('🚨 Test Alert', 'This is a test notification from Imperial Sporthorses', 'test-notif')}
+            className="text-[10px] text-neutral-400 border border-neutral-700 rounded-lg px-2.5 py-1.5 hover:bg-neutral-800 transition"
+          >
+            Test Notif
+          </button>
+        )}
       </div>
 
       {/* Messages */}

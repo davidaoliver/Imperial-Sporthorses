@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imperial-v7'
+const CACHE_NAME = 'imperial-v8'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()

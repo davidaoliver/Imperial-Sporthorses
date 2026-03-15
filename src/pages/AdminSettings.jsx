@@ -84,7 +84,7 @@ export default function AdminSettings() {
       try {
         const arRes = await supabase.from('app_requests').select('*, requester:users!app_requests_requested_by_fkey(display_name)').order('created_at', { ascending: false })
         setAppRequests(arRes.data || [])
-      } catch { setAppRequests([]) }
+      } catch (e) { setAppRequests([]) }
     } catch (err) {
       console.error('fetchAll exception:', err)
     } finally {

@@ -14,6 +14,13 @@ import {
   LogOut,
   ChevronDown,
   ChevronRight,
+  MessageSquarePlus,
+  ArrowUp,
+  ArrowRight,
+  ArrowDown,
+  CheckCircle2,
+  Clock,
+  XCircle,
 } from 'lucide-react'
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -29,6 +36,7 @@ export default function AdminSettings() {
   const [schedule, setSchedule] = useState([])
   const [boardTasks, setBoardTasks] = useState([])
   const [feedBowls, setFeedBowls] = useState([])
+  const [appRequests, setAppRequests] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Form states
@@ -52,6 +60,7 @@ export default function AdminSettings() {
   })
   const [newBoardTask, setNewBoardTask] = useState({ title: '', assigned_to: '' })
   const [newBowlHorse, setNewBowlHorse] = useState({})
+  const [newRequest, setNewRequest] = useState({ title: '', description: '', priority: 'Mid' })
 
   const fetchAll = useCallback(async () => {
     try {
@@ -71,6 +80,11 @@ export default function AdminSettings() {
       setSchedule(sRes.data || [])
       setBoardTasks(bRes.data || [])
       setFeedBowls(bowlRes.data || [])
+      // Fetch app_requests separately so it doesn't break if table doesn't exist yet
+      try {
+        const arRes = await supabase.from('app_requests').select('*, requester:users!app_requests_requested_by_fkey(display_name)').order('created_at', { ascending: false })
+        setAppRequests(arRes.data || [])
+      } catch { setAppRequests([]) }
     } catch (err) {
       console.error('fetchAll exception:', err)
     } finally {
@@ -245,6 +259,7 @@ export default function AdminSettings() {
     { id: 'schedule', label: 'Weekly Schedule', icon: Calendar },
     { id: 'board', label: 'Board Tasks', icon: Target },
     { id: 'feedorder', label: 'Feed Order', icon: Circle },
+    { id: 'requests', label: 'App Requests', icon: MessageSquarePlus },
   ]
 
   return (
@@ -707,6 +722,139 @@ export default function AdminSettings() {
               <p className="text-xs text-neutral-500 text-center py-4">No bowls yet. Tap "Add Bowl" to create one.</p>
             )}
           </div>
+        </div>
+      )}
+      {activeSection === 'requests' && (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-neutral-300 mb-3">Request App Changes</h3>
+          <p className="text-[10px] text-neutral-500 mb-3">Submit feature requests, bug reports, or change requests for the app.</p>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            if (!newRequest.title.trim()) return
+            const { error } = await supabase.from('app_requests').insert({
+              title: newRequest.title.trim(),
+              description: newRequest.description.trim() || null,
+              priority: newRequest.priority,
+              requested_by: profile?.id || null,
+            })
+            if (error) {
+              console.error('[Admin] Failed to create request:', error)
+              alert('Failed to submit: ' + error.message)
+              return
+            }
+            setNewRequest({ title: '', description: '', priority: 'Mid' })
+            fetchAll()
+          }} className="space-y-2 mb-5">
+            <input
+              type="text"
+              value={newRequest.title}
+              onChange={(e) => setNewRequest({ ...newRequest, title: e.target.value })}
+              placeholder="What would you like changed? *"
+              className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <textarea
+              value={newRequest.description}
+              onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
+              placeholder="Details (optional)"
+              rows={2}
+              className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <div className="flex gap-2">
+              <div className="flex-1 flex gap-1">
+                {['High', 'Mid', 'Low'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setNewRequest({ ...newRequest, priority: p })}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-xs font-semibold transition ${
+                      newRequest.priority === p
+                        ? p === 'High' ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/50'
+                        : p === 'Mid' ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50'
+                        : 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
+                        : 'bg-neutral-800 text-neutral-500 hover:bg-neutral-700'
+                    }`}
+                  >
+                    {p === 'High' && <ArrowUp className="w-3 h-3" />}
+                    {p === 'Mid' && <ArrowRight className="w-3 h-3" />}
+                    {p === 'Low' && <ArrowDown className="w-3 h-3" />}
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <button type="submit" className="bg-amber-500 text-black px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition">
+                Submit
+              </button>
+            </div>
+          </form>
+
+          {['High', 'Mid', 'Low'].map((priority) => {
+            const priorityRequests = appRequests.filter((r) => r.priority === priority)
+            if (priorityRequests.length === 0) return null
+            const colors = priority === 'High' ? { label: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-900/50' }
+              : priority === 'Mid' ? { label: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-900/50' }
+              : { label: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-900/50' }
+            return (
+              <div key={priority} className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  {priority === 'High' && <ArrowUp className={`w-3.5 h-3.5 ${colors.label}`} />}
+                  {priority === 'Mid' && <ArrowRight className={`w-3.5 h-3.5 ${colors.label}`} />}
+                  {priority === 'Low' && <ArrowDown className={`w-3.5 h-3.5 ${colors.label}`} />}
+                  <p className={`text-[10px] font-semibold uppercase tracking-wide ${colors.label}`}>
+                    {priority} Priority ({priorityRequests.length})
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {priorityRequests.map((req) => (
+                    <div key={req.id} className={`${colors.bg} border ${colors.border} rounded-lg p-3`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${req.status === 'Done' ? 'text-neutral-500 line-through' : req.status === 'Dismissed' ? 'text-neutral-600 line-through' : 'text-neutral-100'}`}>
+                            {req.title}
+                          </p>
+                          {req.description && (
+                            <p className="text-[11px] text-neutral-400 mt-0.5">{req.description}</p>
+                          )}
+                          <p className="text-[10px] text-neutral-500 mt-1">
+                            {req.requester?.display_name || 'Unknown'} · {new Date(req.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <select
+                            value={req.status}
+                            onChange={async (e) => {
+                              await supabase.from('app_requests').update({ status: e.target.value }).eq('id', req.id)
+                              fetchAll()
+                            }}
+                            className={`text-[10px] rounded-lg border border-neutral-700 bg-neutral-800 px-1.5 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 ${
+                              req.status === 'Open' ? 'text-amber-400' : req.status === 'In Progress' ? 'text-blue-400' : req.status === 'Done' ? 'text-green-400' : 'text-neutral-500'
+                            }`}
+                          >
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Done">Done</option>
+                            <option value="Dismissed">Dismissed</option>
+                          </select>
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Delete this request?')) return
+                              await supabase.from('app_requests').delete().eq('id', req.id)
+                              fetchAll()
+                            }}
+                            className="p-1 text-neutral-600 hover:text-red-400 transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+          {appRequests.length === 0 && (
+            <p className="text-xs text-neutral-500 text-center py-4">No requests yet. Submit one above!</p>
+          )}
         </div>
       )}
     </div>

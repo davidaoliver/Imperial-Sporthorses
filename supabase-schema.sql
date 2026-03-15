@@ -276,6 +276,36 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.feed_inventory;
 -- SEED DATA (Optional - remove or modify for your barn)
 -- ============================================================
 
+-- 10. APP REQUESTS TABLE
+CREATE TABLE public.app_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  priority TEXT NOT NULL DEFAULT 'Mid' CHECK (priority IN ('High', 'Mid', 'Low')),
+  status TEXT NOT NULL DEFAULT 'Open' CHECK (status IN ('Open', 'In Progress', 'Done', 'Dismissed')),
+  requested_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.app_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "App requests viewable by authenticated"
+  ON public.app_requests FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "App requests insertable by authenticated"
+  ON public.app_requests FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "App requests updatable by authenticated"
+  ON public.app_requests FOR UPDATE TO authenticated USING (true);
+
+CREATE POLICY "App requests deletable by authenticated"
+  ON public.app_requests FOR DELETE TO authenticated USING (true);
+
+-- ============================================================
+-- SAMPLE DATA
+-- ============================================================
+
 -- Sample Locations
 INSERT INTO public.locations (name, type, grid_row, grid_col) VALUES
   ('Stall 1', 'Stall', 0, 0),

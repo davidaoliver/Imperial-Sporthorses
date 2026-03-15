@@ -259,7 +259,7 @@ export default function AdminSettings() {
     { id: 'schedule', label: 'Weekly Schedule', icon: Calendar },
     { id: 'board', label: 'Board Tasks', icon: Target },
     { id: 'feedorder', label: 'Feed Order', icon: Circle },
-    { id: 'requests', label: 'App Requests', icon: MessageSquarePlus },
+    { id: 'requests', label: 'App Change Requests', icon: MessageSquarePlus },
   ]
 
   return (
@@ -726,7 +726,7 @@ export default function AdminSettings() {
       )}
       {activeSection === 'requests' && (
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-neutral-300 mb-3">Request App Changes</h3>
+          <h3 className="text-sm font-semibold text-neutral-300 mb-3">App Change Requests</h3>
           <p className="text-[10px] text-neutral-500 mb-3">Submit feature requests, bug reports, or change requests for the app.</p>
           <form onSubmit={async (e) => {
             e.preventDefault()

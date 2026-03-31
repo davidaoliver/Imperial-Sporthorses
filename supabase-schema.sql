@@ -265,11 +265,42 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 10. Enable Realtime on key tables
+-- 10. TASK HAND-OFFS TABLE
+CREATE TABLE public.task_handoffs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  from_user_id UUID NOT NULL REFERENCES public.users(id),
+  to_user_id UUID REFERENCES public.users(id),        -- NULL when "Other" is selected
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  accepted_by UUID REFERENCES public.users(id),        -- who actually accepted (relevant for "Other")
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.task_handoffs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Handoffs viewable by authenticated"
+  ON public.task_handoffs FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Authenticated users can insert handoffs"
+  ON public.task_handoffs FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = from_user_id);
+
+CREATE POLICY "Target user or admins can update handoffs"
+  ON public.task_handoffs FOR UPDATE TO authenticated
+  USING (
+    auth.uid() = to_user_id
+    OR to_user_id IS NULL
+    OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'Admin')
+  );
+
+
+-- 11. Enable Realtime on key tables
 ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.horses;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.feed_inventory;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.task_handoffs;
 
 
 -- ============================================================

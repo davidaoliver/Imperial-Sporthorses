@@ -12,7 +12,10 @@ import {
   Moon,
   RefreshCw,
   User,
+  ArrowRightLeft,
 } from 'lucide-react'
+import useHandoffs from '../hooks/useHandoffs'
+import HandOffModal from '../components/HandOffModal'
 import {
   format,
   startOfWeek,
@@ -68,6 +71,8 @@ export default function WeeklyPlanner() {
   const [filter, setFilter] = useState('all') // 'all' or 'mine'
   const [schedule, setSchedule] = useState([])
   const [templates, setTemplates] = useState([])
+  const [handOffTarget, setHandOffTarget] = useState(null) // { dateStr, shift, fromUserId }
+  const { getHandoff, createHandoff, acceptHandoff } = useHandoffs()
 
   const twoWeekEnd = endOfWeek(addWeeks(weekStart, 1), { weekStartsOn: 1 })
   const allDays = Array.from({ length: 14 }, (_, i) => addDays(weekStart, i))
@@ -259,15 +264,13 @@ export default function WeeklyPlanner() {
 
   // Get staff scheduled for a specific day + shift from the weekly_schedule table
   function getScheduledStaff(date, shift) {
-    // weekly_schedule uses JS-style day_of_week: 0=Sunday, 1=Monday, ..., 6=Saturday
     const dayOfWeek = date.getDay()
     return schedule
       .filter((s) => s.day_of_week === dayOfWeek && s.shift === shift)
       .map((s) => {
-        const name = s.user?.display_name
-        if (name) return name
-        const u = users.find((u) => u.id === s.user_id)
-        return u?.display_name || 'Unknown'
+        const name = s.user?.display_name ||
+          users.find((u) => u.id === s.user_id)?.display_name || 'Unknown'
+        return { id: s.user_id, name }
       })
   }
 
@@ -282,8 +285,7 @@ export default function WeeklyPlanner() {
     if (total === 0 && date) {
       const dayOfWeek = date.getDay()
       myScheduled = schedule.some(
-        (s) => s.day_of_week === dayOfWeek &&
-          ((s.user?.display_name || users.find((u) => u.id === s.user_id)?.display_name) === profile?.display_name)
+        (s) => s.day_of_week === dayOfWeek && s.user_id === profile?.id
       )
     }
 
@@ -537,6 +539,7 @@ export default function WeeklyPlanner() {
             const config = SHIFT_CONFIG[shift]
             const ShiftIcon = config.icon
             const doneCount = shiftTasks.filter((t) => t.status === 'Done').length
+            const staff = getScheduledStaff(selectedDate, shift)
 
             return (
               <div key={shift}>
@@ -549,24 +552,71 @@ export default function WeeklyPlanner() {
                     {doneCount}/{shiftTasks.length}
                   </span>
                 </div>
-                {/* Show scheduled staff for this shift */}
-                {(() => {
-                  const staff = getScheduledStaff(selectedDate, shift)
-                  if (staff.length === 0) return null
-                  return (
-                    <div className="flex items-center gap-1.5 mb-2 ml-6">
-                      <User className="w-3 h-3 text-amber-500/60" />
-                      <span className="text-[10px] text-amber-500/80 font-medium">
-                        {staff.join(', ')}
-                      </span>
-                    </div>
-                  )
-                })()}
+
+                {/* Scheduled staff with hand-off buttons */}
+                {staff.length > 0 && (
+                  <div className="ml-6 mb-2 space-y-1">
+                    {staff.map((person) => {
+                      const handoff = getHandoff(selectedDateStr, shift, person.id)
+                      const isMe = person.id === profile?.id
+                      const canAccept = handoff && handoff.status === 'pending' && handoff.to_user_id === profile?.id
+
+                      return (
+                        <div key={person.id} className="flex items-center gap-1.5 flex-wrap">
+                          <User className="w-3 h-3 text-amber-500/60 shrink-0" />
+                          <span className={`text-[11px] font-medium ${isMe ? 'text-amber-400' : 'text-amber-500/80'}`}>
+                            {person.name}{isMe ? ' (You)' : ''}
+                          </span>
+
+                          {/* Hand-off chain visible to everyone */}
+                          {handoff && (
+                            <>
+                              <ArrowRightLeft className="w-3 h-3 text-amber-400 shrink-0" />
+                              <span className="text-[11px] font-medium text-amber-400">
+                                {handoff.to_user?.display_name || users.find(u => u.id === handoff.to_user_id)?.display_name || 'Unknown'}
+                              </span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
+                                handoff.status === 'accepted'
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {handoff.status === 'accepted' ? '✓ accepted' : 'pending'}
+                              </span>
+                            </>
+                          )}
+
+                          {/* Hand Off button — only visible to the person themselves */}
+                          {isMe && !handoff && (
+                            <button
+                              onClick={() => setHandOffTarget({ dateStr: selectedDateStr, shift, fromUserId: person.id })}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-400 text-[10px] font-semibold active:scale-95 transition ml-1"
+                            >
+                              <ArrowRightLeft className="w-3 h-3" />
+                              Hand Off
+                            </button>
+                          )}
+
+                          {/* Accept button — only visible to the target user */}
+                          {canAccept && (
+                            <button
+                              onClick={() => acceptHandoff(handoff.id)}
+                              className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500 text-black active:scale-95 transition ml-1"
+                            >
+                              Accept
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   {shiftTasks.map((task) => {
                     const style = STATUS_STYLES[task.status]
                     const StatusIcon = style.icon
-                    const isMyTask = task.assigned_to === profile?.id
+                    const isMyTask = task.assigned_to === profile?.id ||
+                      (task._isPreview && task._scheduledNames?.includes(profile?.display_name))
 
                     return (
                       <div
@@ -618,6 +668,21 @@ export default function WeeklyPlanner() {
             )
           })}
         </div>
+      )}
+
+      {/* Hand-Off Modal */}
+      {handOffTarget && (
+        <HandOffModal
+          shift={handOffTarget.shift}
+          dateStr={handOffTarget.dateStr}
+          users={users}
+          currentUserId={profile?.id}
+          onClose={() => setHandOffTarget(null)}
+          onSubmit={async (toUserId) => {
+            await createHandoff(handOffTarget.dateStr, handOffTarget.shift, handOffTarget.fromUserId, toUserId)
+            setHandOffTarget(null)
+          }}
+        />
       )}
     </div>
   )

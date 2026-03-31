@@ -77,7 +77,7 @@ export default function Layout() {
   return (
     <div className="flex flex-col h-screen bg-neutral-950">
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto hide-scrollbar pb-20">
+      <main className="flex-1 overflow-y-auto hide-scrollbar pb-20 safe-area-top">
         {renderTab()}
       </main>
 

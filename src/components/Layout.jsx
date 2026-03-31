@@ -34,27 +34,27 @@ export default function Layout() {
         return (
           <div>
             {/* Sub-tabs for Tasks */}
-            <div className="flex items-center gap-1 px-4 pt-3 pb-1">
+            <div className="flex items-center gap-2 px-4 pt-5 pb-2">
               <button
                 onClick={() => setTasksView('weekly')}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+                className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition ${
                   tasksView === 'weekly'
                     ? 'bg-amber-500/20 text-amber-400'
                     : 'bg-neutral-800/60 text-neutral-400 hover:text-neutral-300'
                 }`}
               >
-                <CalendarDays className="w-3.5 h-3.5" />
+                <CalendarDays className="w-4 h-4" />
                 Weekly
               </button>
               <button
                 onClick={() => setTasksView('board')}
-                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition ${
+                className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition ${
                   tasksView === 'board'
                     ? 'bg-amber-500/20 text-amber-400'
                     : 'bg-neutral-800/60 text-neutral-400 hover:text-neutral-300'
                 }`}
               >
-                <ListChecks className="w-3.5 h-3.5" />
+                <ListChecks className="w-4 h-4" />
                 Board
               </button>
             </div>

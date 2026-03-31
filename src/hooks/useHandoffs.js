@@ -5,6 +5,7 @@ export default function useHandoffs() {
   const [handoffs, setHandoffs] = useState([])
 
   const fetchHandoffs = useCallback(async () => {
+    // Try with joins first, fall back to plain select
     const { data, error } = await supabase
       .from('shift_handoffs')
       .select(
@@ -12,7 +13,7 @@ export default function useHandoffs() {
       )
 
     if (error) {
-      console.error('Error fetching handoffs:', error)
+      console.warn('[Handoffs] Join query failed, trying fallback:', error.message)
       const { data: fallback } = await supabase
         .from('shift_handoffs')
         .select('*')
@@ -65,35 +66,37 @@ export default function useHandoffs() {
     )
     if (existing) return { error: 'A hand-off is already pending' }
 
-    const { error } = await supabase.from('shift_handoffs').insert({
+    const { data: insertData, error } = await supabase.from('shift_handoffs').insert({
       handoff_date: dateStr,
       shift,
       from_user_id: fromUserId,
       to_user_id: toUserId,
-    })
+    }).select()
 
     if (error) {
-      console.error('Error creating handoff:', error)
+      console.error('[Handoffs] Error creating handoff:', error)
       return { error: error.message }
     }
+    await fetchHandoffs()
     return { error: null }
   }
 
   // Accept a handoff
   async function acceptHandoff(handoffId) {
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('shift_handoffs')
       .update({
         status: 'accepted',
         resolved_at: new Date().toISOString(),
       })
       .eq('id', handoffId)
-      .eq('status', 'pending')
+      .select()
 
     if (error) {
-      console.error('Error accepting handoff:', error)
+      console.error('[Handoffs] Error accepting:', error)
       return { error: error.message }
     }
+    await fetchHandoffs()
     return { error: null }
   }
 

@@ -559,7 +559,7 @@ export default function WeeklyPlanner() {
                     {staff.map((person) => {
                       const handoff = getHandoff(selectedDateStr, shift, person.id)
                       const isMe = person.id === profile?.id
-                      const canAccept = handoff && handoff.status === 'pending' && handoff.to_user_id === profile?.id
+                      const canAccept = handoff && handoff.status === 'pending' && (handoff.to_user_id === profile?.id || isAdmin)
 
                       return (
                         <div key={person.id} className="flex items-center gap-1.5 flex-wrap">
@@ -599,7 +599,10 @@ export default function WeeklyPlanner() {
                           {/* Accept button — only visible to the target user */}
                           {canAccept && (
                             <button
-                              onClick={() => acceptHandoff(handoff.id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                acceptHandoff(handoff.id)
+                              }}
                               className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500 text-black active:scale-95 transition ml-1"
                             >
                               Accept

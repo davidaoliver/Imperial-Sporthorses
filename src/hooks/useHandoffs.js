@@ -81,9 +81,16 @@ export default function useHandoffs() {
     return { error: null }
   }
 
-  // Accept a handoff
+  // Accept a handoff and reassign all tasks for that shift+date
   async function acceptHandoff(handoffId) {
-    const { data: updated, error } = await supabase
+    // Fetch the handoff details so we know which shift/date/user to reassign
+    const handoff = handoffs.find((h) => h.id === handoffId)
+    if (!handoff) {
+      console.error('[Handoffs] Handoff not found:', handoffId)
+      return { error: 'Handoff not found' }
+    }
+
+    const { error } = await supabase
       .from('shift_handoffs')
       .update({
         status: 'accepted',
@@ -96,6 +103,20 @@ export default function useHandoffs() {
       console.error('[Handoffs] Error accepting:', error)
       return { error: error.message }
     }
+
+    // Reassign ALL tasks for this shift+date from the original user to the accepting user
+    const { error: reassignError } = await supabase
+      .from('tasks')
+      .update({ assigned_to: handoff.to_user_id })
+      .eq('task_date', handoff.handoff_date)
+      .eq('shift', handoff.shift)
+      .eq('assigned_to', handoff.from_user_id)
+
+    if (reassignError) {
+      console.error('[Handoffs] Error reassigning tasks:', reassignError)
+      return { error: reassignError.message }
+    }
+
     await fetchHandoffs()
     return { error: null }
   }

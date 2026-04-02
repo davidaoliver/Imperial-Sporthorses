@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -72,6 +72,7 @@ export default function WeeklyPlanner() {
   const [schedule, setSchedule] = useState([])
   const [templates, setTemplates] = useState([])
   const [handOffTarget, setHandOffTarget] = useState(null) // { dateStr, shift, fromUserId }
+  const generatingRef = useRef(false)
   const { getHandoff, createHandoff, acceptHandoff } = useHandoffs()
 
   const twoWeekEnd = endOfWeek(addWeeks(weekStart, 1), { weekStartsOn: 1 })
@@ -121,7 +122,13 @@ export default function WeeklyPlanner() {
     }
     for (const task of tasks) {
       if (grouped[task.task_date]) {
-        grouped[task.task_date].push(task)
+        // Deduplicate: skip if same title+shift already exists for this date
+        const isDupe = grouped[task.task_date].some(
+          (t) => t.title === task.title && t.shift === task.shift
+        )
+        if (!isDupe) {
+          grouped[task.task_date].push(task)
+        }
       }
     }
     setWeekTasks(grouped)
@@ -159,12 +166,49 @@ export default function WeeklyPlanner() {
     setTemplates(data || [])
   }, [])
 
+  // Clean up duplicate tasks (same title + shift + task_date)
+  const hasDeduped = useRef(false)
+  const deduplicateTasks = useCallback(async () => {
+    if (hasDeduped.current) return
+    hasDeduped.current = true
+
+    const { data: allTasks, error } = await supabase
+      .from('tasks')
+      .select('id, title, shift, task_date')
+      .not('shift', 'is', null)
+      .order('created_at', { ascending: true })
+
+    if (error || !allTasks) return
+
+    const seen = new Map()
+    const dupeIds = []
+    for (const t of allTasks) {
+      const key = `${t.task_date}|${t.shift}|${t.title}`
+      if (seen.has(key)) {
+        dupeIds.push(t.id)
+      } else {
+        seen.set(key, t.id)
+      }
+    }
+
+    if (dupeIds.length > 0) {
+      console.log(`[WeeklyPlanner] Removing ${dupeIds.length} duplicate tasks`)
+      const { error: delError } = await supabase
+        .from('tasks')
+        .delete()
+        .in('id', dupeIds)
+      if (delError) {
+        console.error('[WeeklyPlanner] Error removing duplicates:', delError)
+      }
+    }
+  }, [])
+
   useEffect(() => {
-    fetchWeekTasks()
+    deduplicateTasks().then(() => fetchWeekTasks())
     fetchUsers()
     fetchSchedule()
     fetchTemplates()
-  }, [fetchWeekTasks, fetchUsers, fetchSchedule, fetchTemplates])
+  }, [deduplicateTasks, fetchWeekTasks, fetchUsers, fetchSchedule, fetchTemplates])
 
   // Realtime updates
   useEffect(() => {
@@ -183,46 +227,55 @@ export default function WeeklyPlanner() {
   // Auto-generate real tasks from templates for a given date
   async function generateTasksForDate(dateStr) {
     if (templates.length === 0) return false
-    // Check if tasks already exist for this date
-    const { data: existing } = await supabase
-      .from('tasks')
-      .select('id')
-      .eq('task_date', dateStr)
-      .not('shift', 'is', null)
-      .limit(1)
-    if (existing && existing.length > 0) return false
+    if (generatingRef.current) return false
+    generatingRef.current = true
 
-    // Look up scheduled staff for this day
-    const date = new Date(dateStr + 'T12:00:00')
-    const dayOfWeek = date.getDay()
-    const staffByShift = {}
-    for (const entry of schedule) {
-      if (entry.day_of_week === dayOfWeek) {
-        if (!staffByShift[entry.shift]) staffByShift[entry.shift] = []
-        staffByShift[entry.shift].push(entry.user_id)
+    try {
+      // Check if tasks already exist for this date (re-check from DB to avoid races)
+      const { data: existing } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('task_date', dateStr)
+        .not('shift', 'is', null)
+        .limit(1)
+      if (existing && existing.length > 0) return false
+
+      // Look up scheduled staff for this day
+      const date = new Date(dateStr + 'T12:00:00')
+      const dayOfWeek = date.getDay()
+      const staffByShift = {}
+      for (const entry of schedule) {
+        if (entry.day_of_week === dayOfWeek) {
+          if (!staffByShift[entry.shift]) staffByShift[entry.shift] = []
+          staffByShift[entry.shift].push(entry.user_id)
+        }
       }
-    }
 
-    const rows = templates.map((t) => ({
-      title: t.title,
-      shift: t.shift,
-      sort_order: t.sort_order,
-      status: 'Pending',
-      task_date: dateStr,
-      assigned_to: staffByShift[t.shift]?.[0] || null,
-    }))
+      const rows = templates.map((t) => ({
+        title: t.title,
+        shift: t.shift,
+        sort_order: t.sort_order,
+        status: 'Pending',
+        task_date: dateStr,
+        assigned_to: staffByShift[t.shift]?.[0] || null,
+      }))
 
-    const { error } = await supabase.from('tasks').insert(rows)
-    if (error) {
-      console.error('Error generating tasks:', error)
-      return false
+      const { error } = await supabase.from('tasks').insert(rows)
+      if (error) {
+        console.error('Error generating tasks:', error)
+        return false
+      }
+      return true
+    } finally {
+      generatingRef.current = false
     }
-    return true
   }
 
-  // Auto-generate today's tasks if past 3 AM and none exist
+  // Auto-generate today's tasks once if past 3 AM and none exist
+  const hasAttemptedGenerate = useRef(false)
   useEffect(() => {
-    if (loading || templates.length === 0) return
+    if (loading || templates.length === 0 || schedule.length === 0) return
+    if (hasAttemptedGenerate.current) return
     const now = new Date()
     if (now.getHours() < 3) return // not yet 3 AM
     const todayStr = format(now, 'yyyy-MM-dd')
@@ -230,6 +283,7 @@ export default function WeeklyPlanner() {
     const hasShiftTasks = todayTasks.some(t => t.shift !== null)
     if (hasShiftTasks) return // already generated
 
+    hasAttemptedGenerate.current = true
     generateTasksForDate(todayStr).then((created) => {
       if (created) fetchWeekTasks()
     })

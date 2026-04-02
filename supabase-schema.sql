@@ -253,13 +253,13 @@ BEGIN
     SELECT
       tt.title,
       tt.shift,
-      ws.user_id,
+      (SELECT ws.user_id FROM public.weekly_schedule ws
+       WHERE ws.shift = tt.shift AND ws.day_of_week = dow
+       LIMIT 1),
       'Pending',
       today,
       tt.sort_order
-    FROM public.task_templates tt
-    LEFT JOIN public.weekly_schedule ws
-      ON ws.shift = tt.shift AND ws.day_of_week = dow;
+    FROM public.task_templates tt;
   END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

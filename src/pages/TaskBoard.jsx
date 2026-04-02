@@ -11,10 +11,7 @@ import {
   X,
   ListChecks,
   Target,
-  ArrowRightLeft,
 } from 'lucide-react'
-import useHandoffs from '../hooks/useHandoffs'
-import HandOffModal from '../components/HandOffModal'
 import { format } from 'date-fns'
 
 const STATUS_STYLES = {
@@ -54,8 +51,6 @@ export default function TaskBoard() {
   const [loading, setLoading] = useState(true)
   const [editingTask, setEditingTask] = useState(null)
   const [filterTab, setFilterTab] = useState('active')
-  const [handOffTask, setHandOffTask] = useState(null)
-  const { getHandoff, createHandoff, acceptHandoff } = useHandoffs()
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -280,11 +275,6 @@ export default function TaskBoard() {
                     const style = STATUS_STYLES[task.status]
                     const StatusIcon = style.icon
                     const isMyTask = task.assigned_to === profile?.id
-                    const handoff = getHandoff(task.id)
-                    const canAcceptHandoff = handoff && (
-                      handoff.to_user_id === profile?.id ||
-                      (handoff.to_user_id === null && isAdmin)
-                    )
 
                     return (
                       <div
@@ -312,43 +302,6 @@ export default function TaskBoard() {
                             {task.completed_at &&
                               `${isMyTask ? ' · ' : ''}Done ${format(new Date(task.completed_at), 'MMM d, h:mm a')}`}
                           </p>
-                          {/* Hand-off status indicator */}
-                          {handoff && (
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <ArrowRightLeft className="w-3 h-3 text-amber-400" />
-                              <span className="text-[10px] font-medium text-amber-400">
-                                {handoff.from_user?.display_name || 'Someone'} → {handoff.to_user?.display_name || 'All Admins'}
-                              </span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
-                                pending
-                              </span>
-                            </div>
-                          )}
-                          {/* Accept button for the target user */}
-                          {canAcceptHandoff && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                acceptHandoff(handoff.id, profile.id)
-                              }}
-                              className="mt-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-amber-500 text-black active:scale-95 transition"
-                            >
-                              Accept Hand-Off
-                            </button>
-                          )}
-                          {/* Hand Off button */}
-                          {task.status !== 'Done' && !handoff && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setHandOffTask(task)
-                              }}
-                              className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 text-amber-400 text-[10px] font-semibold active:scale-95 transition"
-                            >
-                              <ArrowRightLeft className="w-3.5 h-3.5" />
-                              Hand Off
-                            </button>
-                          )}
                         </div>
                         <span
                           className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${style.badge}`}
@@ -387,20 +340,6 @@ export default function TaskBoard() {
             ))
           })()}
         </div>
-      )}
-
-      {/* Hand-Off Modal */}
-      {handOffTask && (
-        <HandOffModal
-          task={handOffTask}
-          users={users}
-          currentUserId={profile?.id}
-          onClose={() => setHandOffTask(null)}
-          onSubmit={async (toUserId) => {
-            await createHandoff(handOffTask.id, profile.id, toUserId)
-            setHandOffTask(null)
-          }}
-        />
       )}
 
       {/* Reassign Modal */}

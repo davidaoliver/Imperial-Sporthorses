@@ -8,9 +8,11 @@ import {
   Settings,
   CalendarDays,
   ListChecks,
+  StickyNote,
 } from 'lucide-react'
 import TaskBoard from '../pages/TaskBoard'
 import WeeklyPlanner from '../pages/WeeklyPlanner'
+import ScheduleNotes from '../pages/ScheduleNotes'
 import FacilityMap from '../pages/FacilityMap'
 import Chat from '../pages/Chat'
 import FeedRoom from '../pages/FeedRoom'
@@ -57,8 +59,19 @@ export default function Layout() {
                 <ListChecks className="w-4 h-4" />
                 Board
               </button>
+              <button
+                onClick={() => setTasksView('schedule')}
+                className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition ${
+                  tasksView === 'schedule'
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'bg-neutral-800/60 text-neutral-400 hover:text-neutral-300'
+                }`}
+              >
+                <StickyNote className="w-4 h-4" />
+                Schedule
+              </button>
             </div>
-            {tasksView === 'weekly' ? <WeeklyPlanner /> : <TaskBoard />}
+            {tasksView === 'weekly' ? <WeeklyPlanner /> : tasksView === 'board' ? <TaskBoard /> : <ScheduleNotes />}
           </div>
         )
       case 'map':

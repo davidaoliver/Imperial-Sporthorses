@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-const VAPID_PUBLIC_KEY = 'BMfjdA2usyIgXEXQDb9kFlFSw1hB7XdbtSuL6cjgokaHD0FvatLWHqlW4j0yHblJJ1VUenHGAO6pbtKUZHWvDXQ'
+const VAPID_PUBLIC_KEY = 'BFMIGD7VybJjnBKevJZ3tbHedEQcHEVXtH0weKu0ONUHvmziV8TEepmvervwJW7Km3Tu2eS8EavBsRtXTdO73yE'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -25,6 +25,17 @@ export async function subscribeToPush(userId) {
 
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription()
+
+    // Unsubscribe old subscription if it exists (VAPID key may have changed)
+    if (subscription) {
+      try {
+        await subscription.unsubscribe()
+        console.log('[Push] Cleared old subscription')
+      } catch (e) {
+        console.warn('[Push] Failed to unsubscribe old:', e)
+      }
+      subscription = null
+    }
 
     if (!subscription) {
       // Request permission and subscribe

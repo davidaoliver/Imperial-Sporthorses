@@ -75,12 +75,12 @@ export default function Chat() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           fetchMessages()
-          // Push notification for alert messages
-          if (payload.new?.is_alert && payload.new?.user_id !== profile?.id) {
+          // Local notification for regular messages (not alerts — alerts use web push)
+          if (!payload.new?.is_alert && payload.new?.user_id !== profile?.id) {
             sendNotification(
-              '🚨 Barn Alert',
+              'New Message',
               payload.new.content,
-              'barn-alert-' + payload.new.id
+              'chat-msg-' + payload.new.id
             )
           }
         }

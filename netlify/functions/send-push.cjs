@@ -13,7 +13,7 @@ exports.handler = async (event) => {
   }
 
   webpush.setVapidDetails(
-    `mailto:${VAPID_EMAIL || 'admin@imperialsporthorses.com'}`,
+    `mailto:${VAPID_EMAIL || 'imperialsporthorse@gmail.com'}`,
     VAPID_PUBLIC_KEY,
     VAPID_PRIVATE_KEY
   );
@@ -52,11 +52,11 @@ exports.handler = async (event) => {
     )
   );
 
-  const sent = results.filter((r) => r.status === 'fulfilled').length;
-  const failed = results.filter((r) => r.status === 'rejected').length;
   const expired = results
     .filter((r) => r.status === 'fulfilled' && r.value?.expired)
     .map((r) => r.value.endpoint);
+  const sent = results.filter((r) => r.status === 'fulfilled' && !r.value?.expired).length;
+  const failed = results.filter((r) => r.status === 'rejected').length;
 
   return {
     statusCode: 200,

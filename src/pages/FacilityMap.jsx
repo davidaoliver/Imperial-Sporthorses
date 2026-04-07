@@ -6,9 +6,9 @@ import { AlertTriangle, RefreshCw, X, Pencil, Save, ZoomIn, ZoomOut, Maximize } 
 // Generate Main Barn stalls: 8 bottom, 4 top-left (Stalls 1-12)
 function generateMainBarnStalls() {
   const stalls = []
-  const bx = 200, by = 340, sw = 27, sh = 35, gap = 2
+  const bx = 200, by = 340, sw = 38, sh = 50, gap = 3
   for (let i = 0; i < 8; i++) {
-    stalls.push({ id: `mb-b${i+1}`, label: `${i+1}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+170-sh-6, w: sw, h: sh, parent: 'main-barn', dbName: `Stall ${i+1}` })
+    stalls.push({ id: `mb-b${i+1}`, label: `${i+1}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+220-sh-6, w: sw, h: sh, parent: 'main-barn', dbName: `Stall ${i+1}` })
   }
   for (let i = 0; i < 4; i++) {
     stalls.push({ id: `mb-t${i+1}`, label: `${i+9}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+22, w: sw, h: sh, parent: 'main-barn', dbName: `Stall ${i+9}` })
@@ -19,12 +19,12 @@ function generateMainBarnStalls() {
 // Generate 6 Stall Barn stalls: 3 top, 3 bottom (Stalls 13-18)
 function generateSixStallBarnStalls() {
   const stalls = []
-  const bx = 10, by = 170, sw = 40, sh = 35, gap = 3
+  const bx = 10, by = 170, sw = 50, sh = 45, gap = 3
   for (let i = 0; i < 3; i++) {
     stalls.push({ id: `sb-t${i+1}`, label: `${i+13}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+22, w: sw, h: sh, parent: '6stall', dbName: `Stall ${i+13}` })
   }
   for (let i = 0; i < 3; i++) {
-    stalls.push({ id: `sb-b${i+1}`, label: `${i+16}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+130-sh-6, w: sw, h: sh, parent: '6stall', dbName: `Stall ${i+16}` })
+    stalls.push({ id: `sb-b${i+1}`, label: `${i+16}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+170-sh-6, w: sw, h: sh, parent: '6stall', dbName: `Stall ${i+16}` })
   }
   return stalls
 }
@@ -32,12 +32,12 @@ function generateSixStallBarnStalls() {
 // Generate 4 Stall Barn stalls: 2 top, 2 bottom (Stalls 19-22)
 function generateFourStallBarnStalls() {
   const stalls = []
-  const bx = 310, by = 130, sw = 38, sh = 32, gap = 3
+  const bx = 310, by = 130, sw = 50, sh = 45, gap = 3
   for (let i = 0; i < 2; i++) {
     stalls.push({ id: `fb-t${i+1}`, label: `${i+19}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+22, w: sw, h: sh, parent: '4stall', dbName: `Stall ${i+19}` })
   }
   for (let i = 0; i < 2; i++) {
-    stalls.push({ id: `fb-b${i+1}`, label: `${i+21}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+110-sh-6, w: sw, h: sh, parent: '4stall', dbName: `Stall ${i+21}` })
+    stalls.push({ id: `fb-b${i+1}`, label: `${i+21}`, type: 'stall', x: bx+10+i*(sw+gap), y: by+150-sh-6, w: sw, h: sh, parent: '4stall', dbName: `Stall ${i+21}` })
   }
   return stalls
 }
@@ -48,17 +48,17 @@ const DEFAULT_AREAS = [
   { id: 'pasture-2', label: 'Pasture #2', type: 'pasture', x: 560, y: 10, w: 180, h: 100, dbName: 'Pasture #2' },
   { id: 'pasture-3', label: 'Pasture #3', type: 'pasture', x: 750, y: 10, w: 240, h: 130, dbName: 'Pasture #3' },
   { id: 'shed', label: 'Shed', type: 'building', x: 170, y: 140, w: 130, h: 80 },
-  { id: '4stall', label: '4 Stall Barn', type: 'barn', x: 310, y: 130, w: 100, h: 110, dbName: '4 Stall Barn' },
+  { id: '4stall', label: '4 Stall Barn', type: 'barn', x: 310, y: 130, w: 120, h: 155, dbName: '4 Stall Barn' },
   ...generateFourStallBarnStalls(),
   { id: 'covered-arena', label: 'Covered Arena', type: 'arena', x: 420, y: 120, w: 200, h: 180 },
-  { id: '6stall', label: '6 Stall Barn', type: 'barn', x: 10, y: 170, w: 150, h: 130, dbName: '6 Stall Barn' },
+  { id: '6stall', label: '6 Stall Barn', type: 'barn', x: 10, y: 170, w: 175, h: 180, dbName: '6 Stall Barn' },
   ...generateSixStallBarnStalls(),
   { id: 'house', label: 'House', type: 'building', x: 640, y: 150, w: 100, h: 280 },
   { id: 'pasture-4', label: 'Pasture #4', type: 'pasture', x: 750, y: 200, w: 240, h: 200, dbName: 'Pasture #4' },
   { id: 'outdoor-arena', label: 'Outdoor Arena', type: 'arena', x: 10, y: 380, w: 180, h: 130 },
-  { id: 'main-barn', label: 'Main Barn', type: 'barn', x: 200, y: 340, w: 250, h: 170 },
+  { id: 'main-barn', label: 'Main Barn', type: 'barn', x: 200, y: 340, w: 340, h: 230 },
   ...generateMainBarnStalls(),
-  { id: 'pasture-5', label: 'Pasture #5', type: 'pasture', x: 200, y: 520, w: 250, h: 90, dbName: 'Pasture #5' },
+  { id: 'pasture-5', label: 'Pasture #5', type: 'pasture', x: 200, y: 580, w: 340, h: 90, dbName: 'Pasture #5' },
   { id: 'feed-room', label: 'Feed Room', type: 'building', x: 460, y: 340, w: 80, h: 50 },
   { id: 'parking', label: 'Parking', type: 'road', x: 460, y: 400, w: 80, h: 260 },
   { id: 'entrance', label: 'Entrance', type: 'road', x: 550, y: 610, w: 120, h: 40 },
@@ -473,8 +473,8 @@ export default function FacilityMap() {
                 />
                 {/* Label */}
                 <text
-                  x={area.x + area.w / 2} y={isStall ? area.y + area.h * 0.4 : area.y + Math.min(16, area.h * 0.15)}
-                  textAnchor="middle" fontSize={isStall ? Math.min(8, area.w * 0.25) : Math.min(11, area.w * 0.06)} fontWeight="700"
+                  x={area.x + area.w / 2} y={isStall ? area.y + area.h * 0.38 : area.y + Math.min(16, area.h * 0.15)}
+                  textAnchor="middle" fontSize={isStall ? Math.min(11, area.w * 0.22) : Math.min(11, area.w * 0.06)} fontWeight="700"
                   fill={isSelected ? '#fbbf24' : style.textColor} opacity={0.9}
                 >
                   {area.label}
@@ -508,8 +508,8 @@ export default function FacilityMap() {
                   return areaHorses.map((h, i) => {
                     const isHere = loc && h.current_location === loc.id
                     return (
-                      <text key={h.id} x={area.x + area.w / 2} y={area.y + area.h * 0.75 + i * Math.min(10, area.h * 0.15)}
-                        textAnchor="middle" fontSize={Math.min(7, area.w * 0.2, area.h * 0.15)} fontWeight="600"
+                      <text key={h.id} x={area.x + area.w / 2} y={area.y + area.h * 0.72 + i * Math.min(12, area.h * 0.18)}
+                        textAnchor="middle" fontSize={Math.min(10, area.w * 0.22)} fontWeight="600"
                         fill={isHere ? '#e5e5e5' : '#a8a29e'} opacity={isHere ? 1 : 0.6}
                       >{h.name}{!isHere ? ' ⌂' : ''}</text>
                     )

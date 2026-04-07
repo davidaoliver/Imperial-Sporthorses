@@ -11,6 +11,8 @@ import {
   Circle,
   Move,
   Save,
+  Pencil,
+  ArrowLeft,
 } from 'lucide-react'
 import { format, differenceInDays, parseISO } from 'date-fns'
 
@@ -33,6 +35,49 @@ export default function FeedRoom() {
     expiration_date: '',
   })
   const [newInventory, setNewInventory] = useState({ feed_name: '', quantity: '' })
+  const [editingHorse, setEditingHorse] = useState(null)
+  const [editForm, setEditForm] = useState({
+    am_grain: '',
+    pm_grain: '',
+    hay_type: '',
+    supplements: '',
+    meds_notes: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  function openHorseEdit(horse) {
+    setEditForm({
+      am_grain: horse.am_grain || '',
+      pm_grain: horse.pm_grain || '',
+      hay_type: horse.hay_type || '',
+      supplements: horse.supplements || '',
+      meds_notes: horse.meds_notes || '',
+    })
+    setEditingHorse(horse)
+  }
+
+  async function saveHorseEdit(e) {
+    e.preventDefault()
+    if (!editingHorse) return
+    setSaving(true)
+    const { error } = await supabase
+      .from('horses')
+      .update({
+        am_grain: editForm.am_grain.trim() || null,
+        pm_grain: editForm.pm_grain.trim() || null,
+        hay_type: editForm.hay_type.trim() || null,
+        supplements: editForm.supplements.trim() || null,
+        meds_notes: editForm.meds_notes.trim() || null,
+      })
+      .eq('id', editingHorse.id)
+    setSaving(false)
+    if (error) {
+      console.error('Error updating horse:', error)
+      return
+    }
+    setEditingHorse(null)
+    fetchData()
+  }
 
   const fetchData = useCallback(async () => {
     try {
@@ -252,14 +297,25 @@ export default function FeedRoom() {
                   className="bg-neutral-900 border border-neutral-800 rounded-xl p-3"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-neutral-100">
+                    <button
+                      onClick={() => openHorseEdit(horse)}
+                      className="text-sm font-semibold text-neutral-100 hover:text-amber-400 transition text-left"
+                    >
                       {horse.name}
-                    </h3>
-                    {horse.meds_notes && (
-                      <span className="text-[9px] bg-purple-900/40 text-purple-400 px-2 py-0.5 rounded-full font-medium">
-                        Meds
-                      </span>
-                    )}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      {horse.meds_notes && (
+                        <span className="text-[9px] bg-purple-900/40 text-purple-400 px-2 py-0.5 rounded-full font-medium">
+                          Meds
+                        </span>
+                      )}
+                      <button
+                        onClick={() => openHorseEdit(horse)}
+                        className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div>
@@ -294,6 +350,13 @@ export default function FeedRoom() {
                       </p>
                     </div>
                   )}
+                  <button
+                    onClick={() => openHorseEdit(horse)}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 bg-amber-500/20 text-amber-400 text-xs font-semibold py-2 rounded-lg hover:bg-amber-500/30 transition"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit Feed & Notes
+                  </button>
                 </div>
               ))}
             </div>
@@ -561,6 +624,101 @@ export default function FeedRoom() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Full-Screen Horse Edit */}
+      {editingHorse && (
+        <div className="fixed inset-0 bg-neutral-950 z-50 flex flex-col animate-fade-in overflow-auto">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-4 border-b border-neutral-800 safe-area-top">
+            <button
+              onClick={() => setEditingHorse(null)}
+              className="p-1.5 text-neutral-400 hover:text-neutral-100 transition"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold text-amber-400 truncate">
+                {editingHorse.name}
+              </h2>
+              <p className="text-[10px] text-neutral-500">Edit feed & supplements</p>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={saveHorseEdit} className="flex-1 px-4 py-5 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">
+                AM Grain
+              </label>
+              <input
+                type="text"
+                value={editForm.am_grain}
+                onChange={(e) => setEditForm({ ...editForm, am_grain: e.target.value })}
+                placeholder="e.g. 2 scoops Strategy"
+                className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">
+                PM Grain
+              </label>
+              <input
+                type="text"
+                value={editForm.pm_grain}
+                onChange={(e) => setEditForm({ ...editForm, pm_grain: e.target.value })}
+                placeholder="e.g. 1 scoop SafeChoice"
+                className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">
+                Hay Type
+              </label>
+              <input
+                type="text"
+                value={editForm.hay_type}
+                onChange={(e) => setEditForm({ ...editForm, hay_type: e.target.value })}
+                placeholder="e.g. Timothy, Alfalfa mix"
+                className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">
+                Supplements
+              </label>
+              <input
+                type="text"
+                value={editForm.supplements}
+                onChange={(e) => setEditForm({ ...editForm, supplements: e.target.value })}
+                placeholder="e.g. SmartPak, Vitamin E"
+                className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-400 mb-1">
+                Meds / Notes
+              </label>
+              <textarea
+                value={editForm.meds_notes}
+                onChange={(e) => setEditForm({ ...editForm, meds_notes: e.target.value })}
+                placeholder="e.g. Bute 1g twice daily, allergic to..."
+                rows={3}
+                className="w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+              />
+            </div>
+
+            <div className="pt-2 pb-24">
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full bg-amber-500 text-black rounded-xl px-4 py-3 font-semibold hover:bg-amber-400 transition disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
